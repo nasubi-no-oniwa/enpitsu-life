@@ -132,8 +132,8 @@
   // =============================================
   //  鉛筆を読む（まとめ＋新しい分。確かめた鉛筆と、確かめ中の鉛筆）
   // =============================================
-  const DV = () => store('el_dv2') || {};
-  function dvSave(f, st) { const o = DV(); o[f] = st; for (const k of Object.keys(o)) if (Math.abs(+k - f) > 3) delete o[k]; store('el_dv2', o); }
+  const DV = () => store('el_dv3') || {};
+  function dvSave(f, st) { const o = DV(); o[f] = st; for (const k of Object.keys(o)) if (Math.abs(+k - f) > 3) delete o[k]; store('el_dv3', o); }
   let worker = null, wid = 0; const wcb = {};
   function getWorker() {
     if (worker !== null) return worker;
@@ -197,8 +197,8 @@
       try { const v = await rest('cells/' + lv.f, { orderBy: 't', startAt: F.maxT + 1 }); for (const k in v || {}) { if (!v[k]) continue; F.raw[k] = v[k]; if (v[k].t > F.maxT) F.maxT = v[k].t; } } catch (e) { }
     }
     const m = V.shown(F.st, F.raw, F.rest, lv);
-    for (const k in F.raw) { const c = F.raw[k]; if (c && c.t > (F.st.t || 0) - 1) { const n = Math.min(30, c.n | 0 || 1, FT.capOf(lv, +k)); if (n <= 0) continue; const cur = m.get(+k); if (!cur || cur.n < n) m.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); } }
-    for (const [k, c] of mine || []) { const n = Math.min(c.n | 0, FT.capOf(lv, k)); if (n <= 0) continue; const cur = m.get(k); if (!cur || cur.n < n) m.set(k, Object.assign({}, c, { n })); }
+    for (const k in F.raw) { const c = F.raw[k]; if (c && c.t > (F.st.t || 0) - 1) { const n = Math.min(30, c.n | 0 || 1, FT.capOf(lv, +k)); if (n <= 0 || !FT.keyOk(lv, +k)) continue; const cur = m.get(+k); if (!cur || cur.n < n) m.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); } }
+    for (const [k, c] of mine || []) { const n = Math.min(c.n | 0, FT.capOf(lv, k)); if (n <= 0 || !FT.keyOk(lv, k)) continue; const cur = m.get(k); if (!cur || cur.n < n) m.set(k, Object.assign({}, c, { n })); }
     return m;
   };
   N.present = lv => lv._F ? V.presentOf(lv._F.st, lv._F.raw) : {};
@@ -303,7 +303,7 @@
     const r = await Promise.allSettled(jobs); if (r[0].status !== 'fulfilled') throw r[0].reason;
   };
   // その層を本当に越えた一番早い記録
-  const VC = () => store('el_vc2') || {};
+  const VC = () => store('el_vc3') || {};
   N.firstClear = async function (lv) {
     const f = lv.f;
     if (N.more(lv)) return { wait: true };
@@ -319,7 +319,7 @@
         if (budget <= 0) return { wait: true };
         budget -= Math.min(120 * 60 * 10, Math.max(1, c.k | 0));
         if (await N.verifyClearAsync(lv, c, present)) return c;
-        cur = c.t; const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc2', o);
+        cur = c.t; const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc3', o);
       }
       if (list.length < 10) return null;
     }

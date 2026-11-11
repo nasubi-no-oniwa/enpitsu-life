@@ -46,6 +46,15 @@
   FT.colOf = x => Math.floor(x / CW);
   // その場所の列に積める本数（赤い線）
   FT.capOf = (lv, k) => (lv && lv.cap) ? (lv.cap[Math.floor((k % KC) * CW + CW / 2)] | 0) : 30;
+  // その山の場所が正しいか：列のまん中の真下が固いマスで、その上が空いている
+  //  （ブロックの端からはみ出して、宙に浮いた鉛筆は数えない・見せない・足場にしない）
+  const solidC = c => c === 1 || c === 2 || c === 4;   // BLOCK・BOOK・GLUE
+  FT.keyOk = (lv, k) => {
+    if (!lv || !lv.tiles) return true;
+    const sy = Math.floor(k / KC), tx = Math.floor((k % KC) * CW + CW / 2);
+    if (tx < 0 || tx >= lv.w || sy < 0 || sy >= lv.h) return false;
+    return solidC(lv.tiles[sy * lv.w + tx]) && !(sy > 0 && solidC(lv.tiles[(sy - 1) * lv.w + tx]));
+  };
   // ---------- 角度と強さ（操作の記録に入る形） ----------
   //  a：角度の番号 0〜240（0.5度きざみ、120がまっすぐ上）  p：強さ 0〜1000
   FT.aIdx = deg => Math.max(0, Math.min(240, Math.round((deg + AMAX) * 2)));
@@ -71,7 +80,7 @@
       // 列ごとの鉛筆の山（ぶつかりの計算を軽くする）
       this.cols = new Map();
       // 赤い線（その列に積める本数）より上の鉛筆は、ないものとして計算する（同時に積まれて数がこえても、見え方と動きを決まりどおりにする）
-      for (const [k, c] of cor) { const col = FT.kcol(k), sy = FT.ksy(k), n = Math.min(c.n | 0, 30, FT.capOf(lv, k)); if (n <= 0) continue; let a = this.cols.get(col); if (!a) this.cols.set(col, a = []); a.push({ k, sy, n, top: sy - n * PH }); }
+      for (const [k, c] of cor) { if (!FT.keyOk(lv, k)) continue; const col = FT.kcol(k), sy = FT.ksy(k), n = Math.min(c.n | 0, 30, FT.capOf(lv, k)); if (n <= 0) continue; let a = this.cols.get(col); if (!a) this.cols.set(col, a = []); a.push({ k, sy, n, top: sy - n * PH }); }
       this.t = 0; this.over = false; this.clear = false; this.dead = null; this.place = null;
       // 立っている（stand：立っている山。null はスタートの台）
       const st = lv.start;
@@ -84,6 +93,8 @@
     solidT(c) { return c === T.BLOCK || c === T.BOOK || c === T.GLUE; }
     solid(tx, ty) { return this.solidT(this.tile(tx, ty)); }
     capAt(tx) { return tx >= 0 && tx < this.W ? this.cap[tx] : 0; }
+    // その列のまん中の真下が、刺さることのできる面か（固いマスで、上が空いている）
+    surfOk(col, ty) { const tx = Math.floor(FT.colX(col)); return this.solid(tx, ty) && !this.solid(tx, ty - 1); }
     // 箱が固いマスに重なるか
     boxHitsTile(x, y) {
       const x0 = Math.floor(x - HB), x1 = Math.floor(x + HB - 1e-9), y0 = Math.floor(y - HB), y1 = Math.floor(y + HB - 1e-9);
@@ -193,9 +204,17 @@
     shatter(kind) { this.over = true; this.dead = kind; this.place = { k: -1, why: 'shatter' }; this.ev('die', kind); return this.place; }
     // 地面に刺さった
     ground() {
-      const p = this.p, col = FT.colOf(p.x), tx = Math.floor(p.x), ty = Math.round(p.y + HB);
+      const p = this.p, ty = Math.round(p.y + HB);
+      let col = FT.colOf(p.x);
       this.over = true; this.dead = 'ground';
-      if (this.tile(tx, ty) === T.GLUE || this.capAt(Math.floor(FT.colX(col))) <= 0) { this.place = { k: -1, why: 'sink', x: p.x, y: ty }; this.ev('die', 'sink'); return this.place; }
+      // 鉛筆の先（列のまん中）がマスの上にない＝ブロックの角に当たった：となりの、マスの上にある列に寄せて刺す（はみ出して宙に浮かない）
+      if (!this.surfOk(col, ty)) {
+        const a = col - 1, b = col + 1, na = Math.abs(FT.colX(a) - p.x) <= Math.abs(FT.colX(b) - p.x);
+        col = [na ? a : b, na ? b : a].find(c => this.surfOk(c, ty));
+        if (col === undefined) { this.place = { k: -1, why: 'sink', x: p.x, y: ty }; this.ev('die', 'sink'); return this.place; }
+      }
+      const tx = Math.floor(FT.colX(col));
+      if (this.tile(tx, ty) === T.GLUE || this.capAt(tx) <= 0) { this.place = { k: -1, why: 'sink', x: p.x, y: ty }; this.ev('die', 'sink'); return this.place; }
       this.place = { k: ck(ty, col), n: 1, why: 'ground' };
       this.ev('die', 'ground');
       return this.place;

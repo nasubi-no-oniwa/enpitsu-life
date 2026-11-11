@@ -11,18 +11,21 @@
   // 始まりの鉛筆が、確かめた鉛筆の中にあるか（present：{ 場所: 本数 }）
   //  赤い線より上の分は数えない（同時に積まれて、端末にはそれより多く見えていたことがあるため）
   function snapOk(snap, present, lv) {
-    for (const [k, c] of snap) { const need = Math.min(c.n, FT.capOf(lv, k)); if (need <= 0) continue; const q = present[k]; if (!q || need > q) return false; }
+    for (const [k, c] of snap) { if (!FT.keyOk(lv, k)) continue; const need = Math.min(c.n, FT.capOf(lv, k)); if (need <= 0) continue; const q = present[k]; if (!q || need > q) return false; }
     return true;
   }
   V.snapOk = snapOk;
-  // 1つの鉛筆の記録：'ok' / 'snap' / 'replay' / 'long' / 'nodata' / 'cap'
+  // 前の版の決まりが関わる記録か（赤い線より上の鉛筆・はみ出した鉛筆が始まりにある、またははみ出した場所に刺さった）
+  //  今の決まりで再生すると合わないことがあるが、ずるではないので「だめ」の数には入れない（その鉛筆は数えない）
+  V.oldRec = (lv, snap, p) => { if (!FT.keyOk(lv, +p)) return true; for (const [k, c] of snap) if (c.n > FT.capOf(lv, k) || !FT.keyOk(lv, k)) return true; return false; };
+  // 1つの鉛筆の記録：'ok' / 'snap' / 'replay' / 'long' / 'nodata' / 'cap' / 'old'（前の版の決まりが関わって合わない）
   V.verifyDeath = function (lv, it, present) {
     if (!it || typeof it.r !== 'string' || typeof it.c !== 'string' || !(it.k >= 1) || typeof it.p !== 'string') return 'nodata';
     if (it.k > V.DMAX) return 'long';
     const snap = FT.corParse(it.c);
     if (!snapOk(snap, present, lv)) return 'snap';
     const r = FT.replay(lv, snap, it.r, (it.k | 0) + 2);
-    if (!(r.over && !r.clear && r.place && r.place.k >= 0 && String(r.place.k) === it.p)) return 'replay';
+    if (!(r.over && !r.clear && r.place && r.place.k >= 0 && String(r.place.k) === it.p)) return V.oldRec(lv, snap, it.p) ? 'old' : 'replay';
     // 積み重ねる上限（赤い線）をこえていないか
     const tx = Math.floor(FT.colX(FT.kcol(r.place.k)));
     if ((present[it.p] || 0) + 1 > Math.max(1, lv.cap[tx] | 0)) return 'cap';
@@ -88,7 +91,7 @@
     const pend = {};
     for (const d of rest || []) if ((st.bad[d.u] || 0) < 3) pend[d.p] = (pend[d.p] || 0) + 1;
     const keys = new Set([...Object.keys(st.P), ...Object.keys(pend)]);
-    for (const k of keys) { const c = raw[k]; if (!c) continue; const n = Math.min(30, c.n | 0 || 1, (st.P[k] || 0) + (pend[k] || 0), FT.capOf(lv, +k)); if (n > 0) out.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); }
+    for (const k of keys) { const c = raw[k]; if (!c || !FT.keyOk(lv, +k)) continue; const n = Math.min(30, c.n | 0 || 1, (st.P[k] || 0) + (pend[k] || 0), FT.capOf(lv, +k)); if (n > 0) out.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); }
     return out;
   };
 })(typeof window !== 'undefined' ? window : globalThis);

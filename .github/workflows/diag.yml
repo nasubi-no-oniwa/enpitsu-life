@@ -1,0 +1,22 @@
+# 確かめで鉛筆が数えられない理由を調べる（手で動かす。ログに出すだけで、何も書きかえない）
+name: diag
+on:
+  workflow_dispatch:
+    inputs:
+      floor:
+        description: '層の番号'
+        default: '1'
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: node tools/diag.js
+        env:
+          EL_DIAG_F: ${{ github.event.inputs.floor }}

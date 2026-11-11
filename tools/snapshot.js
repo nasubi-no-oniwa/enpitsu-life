@@ -16,8 +16,8 @@ else { const ctx = { window: {} }; vm.createContext(ctx); vm.runInContext(fs.rea
 const OUT = process.env.EL_SNAP_DIR || path.join(ROOT, 'data', 'snap');
 const floors = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/levels.json'))).map(FT.makeLevel);
 const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
-// 確かめ方の版（変えたら、前のまとめの確かめをやりなおす）。2：赤い線より上の分は数えない
-const SVER = 2;
+// 確かめ方の版（変えたら、前のまとめの確かめをやりなおす）。2：赤い線より上の分は数えない　3：はみ出した鉛筆は数えない
+const SVER = 3;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);

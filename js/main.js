@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '5';
+  FT.VER = '6';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -420,6 +420,7 @@
     // 鉛筆（赤い線は、山のある所だけ）
     const runCor = r ? r.cor : new Map();
     for (const [k, c] of S.cor) {
+      if (!FT.keyOk(lv, k)) continue;   // はみ出して宙に浮いた鉛筆は描かない
       const col = FT.kcol(k), sy = FT.ksy(k), cxw = FT.colX(col);
       if (cxw < ox - 2 || cxw > ox + W2 / s + 2) continue;
       const ghost = r && !runCor.has(k) && S.mode === 'play';
