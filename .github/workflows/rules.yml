@@ -1,0 +1,38 @@
+# database.rules.el.json を GitHub に上げると、自動で ft-blue に反映する（Fairies' Tower のルールはそのまま残す）
+name: データベースのルールを反映
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'database.rules.el.json'
+      - 'tools/deploy-rules.mjs'
+      - '.github/workflows/rules.yml'
+  workflow_dispatch:
+concurrency:
+  group: el-rules
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: ルールの試験（にせのデータベースで）
+        run: node tools/eltest.js
+      - name: 道具を入れる
+        run: mkdir -p "$RUNNER_TEMP/x" && cd "$RUNNER_TEMP/x" && npm init -y >/dev/null && npm i google-auth-library@9 --silent
+      - name: 鍵を一時ファイルに書く
+        env:
+          SA: ${{ secrets.FT_BLUE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then echo "FT_BLUE_SERVICE_ACCOUNT が登録されていません"; exit 1; fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+      - name: ルールを反映
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: node tools/deploy-rules.mjs
+      - name: 鍵を消す
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

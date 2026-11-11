@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>エンピツライフ 管理</title><meta name="robots" content="noindex">
+<style>
+body{font-family:'Hiragino Maru Gothic ProN',sans-serif;background:#f6f1e3;color:#2b2b33;margin:0;padding:14px;max-width:760px;margin:0 auto;font-size:15px}
+h1{font-size:22px;margin:6px 0 10px}h2{font-size:17px;margin:18px 0 6px;border-bottom:2px solid #2b2b33}
+.box{background:#fffdf7;border:2px solid #2b2b33;border-radius:10px;padding:10px;margin:8px 0}
+button{font:inherit;padding:6px 10px;border:2px solid #2b2b33;border-radius:8px;background:#fff;cursor:pointer;margin:2px}
+button.red{background:#ffe3df;border-color:#c0392b}
+input,textarea{font:inherit;padding:6px;border:2px solid #2b2b33;border-radius:8px;width:100%;box-sizing:border-box;margin:3px 0}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #d7cfb8;padding:4px;text-align:left;vertical-align:top}
+.new{background:#fff4c2}.small{font-size:12px;opacity:.8}.ng{color:#c0392b;font-weight:900}.okc{color:#1f7a3a;font-weight:900}
+#log{white-space:pre-wrap;font-size:12px}
+</style></head><body>
+<h1>エンピツライフ 管理</h1>
+<div class="box" id="login">
+ <p>管理のかぎ（Fairies' Tower と同じかぎ）を入れて入ってください。</p>
+ <input id="key" type="password" autocomplete="off"><button id="bLogin">入る</button>
+</div>
+<div id="main" hidden>
+ <h2>ようす</h2><div class="box" id="status">…</div><button id="bRe">読みなおす</button>
+ <h2>詰みの知らせ</h2><div class="box" id="reps">…</div>
+ <h2>層の管理</h2>
+ <div class="box">
+  層の番号 <input id="fl" type="number" min="1" max="100" value="1" style="width:90px"><button id="bFl">鉛筆を置いた人を見る</button>
+  <div id="who"></div>
+  <p class="small">「取り除く」は、その人が置いた鉛筆を全部消します（にせの鉛筆・荒らし用）。「この層の鉛筆を全部消す」は、元にもどせません。越えた層・挑戦中の層の鉛筆は、ふつうは消さないでください。</p>
+  <button class="red" id="bReset">この層の鉛筆を全部消す</button>
+  <button id="bCkpt">ここまでを「本物」として確かめ済みにする</button>
+ </div>
+ <h2>配信中</h2>
+ <div class="box"><div id="lives"></div>
+  名前 <input id="lvN" maxlength="20"> 配信のURL <input id="lvU" placeholder="https://"> ひとこと <input id="lvM" maxlength="30">
+  <button id="bLive">配信中に出す</button></div>
+ <h2>掲示板</h2>
+ <div class="box">お知らせ（掲示板のいちばん上に出る。空にすると消える）<textarea id="pin" rows="2" maxlength="300"></textarea><button id="bPin">お知らせを入れる</button>
+  <div id="posts"></div></div>
+ <h2>終わり</h2>
+ <div class="box"><p>第100層が越えられたら押す。押すと、だれも書きこめなくなる（元にもどせません）。</p><button class="red" id="bEnd">ゲームを終える</button></div>
+ <div id="log"></div>
+</div>
+<script src="js/i18n.js"></script><script src="js/config.js"></script><script src="js/engine.js"></script><script src="js/verify.js"></script><script src="js/net.js"></script>
+<script>
+(function(){
+const FT=window.FT,N=FT.NET,$=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tm=t=>t?new Date(t).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const log=s=>{$('log').textContent=tm(Date.now())+' '+s+'\n'+$('log').textContent;};
+async function login(){const k=$('key').value.trim();if(!k)return;try{await N.adminLogin(k);sessionStorage.setItem('el_ak',k);$('login').hidden=true;$('main').hidden=false;load();}catch(e){alert('入れませんでした（かぎがちがうかもしれません）');}}
+$('bLogin').onclick=login;
+const sk=sessionStorage.getItem('el_ak');if(sk){$('key').value=sk;login();}
+async function load(){status();reps();lives();posts();}
+$('bRe').onclick=load;
+async function status(){
+  const [op,st,ck,end]=await Promise.all([N.rest('open').catch(()=>null),N.rest('stat').catch(()=>null),N.rest('ckpt').catch(()=>null),N.rest('end').catch(()=>null)]);
+  let top=0;for(const k in op||{})if(+k>top)top=+k;
+  let d=0;for(const k in st||{})d+=(st[k]&&st[k].d)||0;
+  let h=`<p>開いた層：<b>第${top+1}層まで</b>（越えられた層 ${Object.keys(op||{}).length}）・みんなの鉛筆（死んだ数）<b>${d.toLocaleString()}</b>・確かめ済みにした層 ${ck??'なし'}${end?' ・<span class="ng">終わり</span>':''}</p>`;
+  h+='<table><tr><th>層</th><th>死んだ数</th><th>越えた数</th><th>いちばん先</th><th>一番乗り</th></tr>';
+  for(let f=Math.max(1,top-6);f<=Math.min(100,top+1);f++){const s=(st||{})[f]||{},o=(op||{})[f];h+=`<tr><td>${f}</td><td>${s.d||0}</td><td>${s.c||0}</td><td>${Math.round((s.m||0)/10)}%</td><td>${o?esc(o.n)+(o.x?' @'+esc(o.x):'')+' '+tm(o.t):''}</td></tr>`;}
+  $('status').innerHTML=h+'</table><p class="small">いちばん進んでいる人の位置は「開いた層」と「いちばん先」です。層の形を変えるときは、これより十分上の層だけにしてください。</p>';
+}
+async function reps(){
+  let v={},seen={};try{v=await N.reports();seen=await N.restMe('repok')||{};}catch(e){$('reps').textContent='読めませんでした';return;}
+  const rows=[];for(const f in v)for(const id in v[f]){const r=v[f][id];if(r)rows.push(Object.assign({f:+f,id},r));}
+  rows.sort((a,b)=>b.t-a.t);
+  if(!rows.length){$('reps').textContent='知らせはありません';return;}
+  let h='<table><tr><th>時刻</th><th>層</th><th>いちばん先</th><th>自動の判定</th><th></th></tr>';
+  for(const r of rows.slice(0,80)){const nw=r.t>(seen[r.f]||0),bad=/越えられない/.test(r.a);h+=`<tr class="${nw?'new':''}"><td>${tm(r.t)}</td><td>${r.f}</td><td>${Math.round(r.m/10)}%</td><td class="${bad?'ng':'okc'}">${esc(r.a)}</td><td><button data-seen="${r.f}" data-t="${r.t}">見た</button></td></tr>`;}
+  $('reps').innerHTML=h+'</table><button id="bRepDel">見た層の知らせを消す</button>';
+  $('reps').querySelectorAll('[data-seen]').forEach(b=>b.onclick=async()=>{await N.repSeen(+b.dataset.seen,+b.dataset.t);reps();});
+  $('bRepDel').onclick=async()=>{for(const f in seen)await N.repDel(f).catch(()=>{});reps();};
+}
+let G=[];
+$('bFl').onclick=async()=>{const f=+$('fl').value;G=await N.dlog(f);let h='<table><tr><th>匿名ID</th><th>置いた数</th><th>はじめ</th><th>さいご</th><th></th></tr>';G.slice(0,60).forEach((g,i)=>{h+=`<tr><td class="small">${esc(g.u.slice(0,10))}…</td><td>${g.n}</td><td>${tm(g.first)}</td><td>${tm(g.last)}</td><td><button class="red" data-i="${i}">取り除く</button></td></tr>`;});$('who').innerHTML=G.length?h+'</table>':'まだだれも置いていません';
+  $('who').querySelectorAll('[data-i]').forEach(b=>b.onclick=async()=>{if(!confirm('この人の鉛筆を全部取り除きますか？'))return;const n=await N.removeBy(f,G[+b.dataset.i]);log(`第${f}層：${n}か所から取り除いた`);$('bFl').onclick();});};
+$('bReset').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層の鉛筆を全部消しますか？（元にもどせません）`))return;await N.resetFloor(f);log(`第${f}層の鉛筆を全部消した`);};
+$('bCkpt').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層までを確かめ済みにしますか？`))return;await N.setCkpt(f);log(`第${f}層までを確かめ済みにした`);status();};
+async function lives(){const L=await N.live().catch(()=>[]);$('lives').innerHTML=L.length?L.map(x=>`<div>● ${esc(x.n)} <a href="${esc(x.u)}" target="_blank">${esc(x.u)}</a> ${esc(x.m)} <button data-id="${x.id}">消す</button></div>`).join(''):'<p class="small">いまはだれも出ていません</p>';$('lives').querySelectorAll('[data-id]').forEach(b=>b.onclick=async()=>{await N.liveDel(b.dataset.id);lives();});}
+$('bLive').onclick=async()=>{try{await N.liveAdd($('lvN').value,$('lvU').value,$('lvM').value);$('lvN').value=$('lvU').value=$('lvM').value='';lives();log('配信中に出した');}catch(e){alert(e.message);}};
+async function posts(){N.boardPin().then(p=>{$('pin').value=typeof p==='string'?p:'';});const v=await N.boardRead('all',0).catch(()=>[]);$('posts').innerHTML='<table>'+v.slice().reverse().map(c=>`<tr><td class="small">${tm(c.t)}</td><td>${esc(c.n)}</td><td>${esc(c.m)}${(c.r|0)?` <span class="ng">通報${c.r}</span>`:''}</td><td><button data-id="${c.id}">消す</button></td></tr>`).join('')+'</table>';$('posts').querySelectorAll('[data-id]').forEach(b=>b.onclick=async()=>{await N.boardDel('all',b.dataset.id);posts();});}
+$('bPin').onclick=async()=>{await N.boardSetPin('all',$('pin').value);log('お知らせを入れた');};
+$('bEnd').onclick=async()=>{if(!confirm('ゲームを終えますか？（元にもどせません）'))return;if(!confirm('本当に終えますか？'))return;await N.setEnd();log('ゲームを終えた');status();};
+})();
+</script></body></html>
