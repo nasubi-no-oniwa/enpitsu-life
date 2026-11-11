@@ -11,6 +11,7 @@
 </script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<script>/* ダブルタップで画面が大きくならないようにする（iPhoneのSafariは user-scalable=no を聞かないため）。文字を入れる欄はそのまま */(function(){var last=0,lx=0,ly=0;document.addEventListener('touchend',function(e){var t=e.changedTouches&&e.changedTouches[0];if(!t)return;var now=Date.now(),near=Math.abs(t.clientX-lx)<40&&Math.abs(t.clientY-ly)<40,el=e.target;if(now-last<350&&near&&!(el&&el.closest&&el.closest('input,textarea,select,[contenteditable]')))e.preventDefault();last=now;lx=t.clientX;ly=t.clientY;},{passive:false});document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false});})();</script>
 <title>エンピツライフ</title>
 <meta name="description" content="ロケット鉛筆を飛ばして、刺さった鉛筆を足場に。みんなの鉛筆で100層を越えていく。">
 <meta property="og:title" content="エンピツライフ">
@@ -27,6 +28,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:'Zen Maru Gothic','Hiragino Maru Gothic ProN',sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block}
+button,a,label{touch-action:manipulation}
 .hand{font-family:'Yomogi','Zen Maru Gothic',cursive}
 button{font:inherit;color:inherit;cursor:pointer}
 .btn{display:block;width:100%;margin:8px 0;padding:12px 14px;border:2.5px solid var(--ink);border-radius:14px 10px 13px 9px;background:var(--btn);font-weight:900;font-size:17px;box-shadow:3px 3px 0 var(--ink);transition:transform .06s}

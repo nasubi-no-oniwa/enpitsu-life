@@ -1,7 +1,7 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><script>/* ダブルタップで画面が大きくならないようにする（iPhoneのSafariは user-scalable=no を聞かないため）。文字を入れる欄はそのまま */(function(){var last=0,lx=0,ly=0;document.addEventListener('touchend',function(e){var t=e.changedTouches&&e.changedTouches[0];if(!t)return;var now=Date.now(),near=Math.abs(t.clientX-lx)<40&&Math.abs(t.clientY-ly)<40,el=e.target;if(now-last<350&&near&&!(el&&el.closest&&el.closest('input,textarea,select,[contenteditable]')))e.preventDefault();last=now;lx=t.clientX;ly=t.clientY;},{passive:false});document.addEventListener('dblclick',function(e){e.preventDefault();},{passive:false});})();</script>
 <title>エンピツライフ 管理</title><meta name="robots" content="noindex">
-<style>
+<style>html{touch-action:manipulation}button,a,label{touch-action:manipulation}input,select,textarea{font-size:16px}
 body{font-family:'Hiragino Maru Gothic ProN',sans-serif;background:#f6f1e3;color:#2b2b33;margin:0;padding:14px;max-width:760px;margin:0 auto;font-size:15px}
 h1{font-size:22px;margin:6px 0 10px}h2{font-size:17px;margin:18px 0 6px;border-bottom:2px solid #2b2b33}
 .box{background:#fffdf7;border:2px solid #2b2b33;border-radius:10px;padding:10px;margin:8px 0}
