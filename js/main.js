@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '14';
+  FT.VER = '15';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -13,7 +13,13 @@
   const OFFLINE = /[?&]offline=1/.test(location.search) || !N.ready();
   // ---------- 自分のこと（この端末だけ） ----------
   const ME = Object.assign({ dead: 0, best: 1, how: 0, xid: '', bname: '', bpost: 0, bhide: [], seen: 0 }, N.store('el_me') || {});
-  if (!ME.bp || typeof ME.bp !== 'object') ME.bp = {};   // 層ごとの、自分がいちばん先まで行った割合（0〜1000）
+  if (!ME.bp || typeof ME.bp !== 'object') ME.bp = {};
+  // ---------- 鉛筆の輝き（死んだ回数の節目で1段ずつ輝く。見た目だけで、飛び方は変わらない） ----------
+  const SHINE = [50, 100, 200, 300, 500, 700, 1000, 2000];
+  const SHINE_NAME = ['', 'ほんのり光る', 'きらきら', '金色', '虹の軌跡', '星をまとう', '光の柱', '虹色', '伝説'];
+  const SHINE_MSG = ['', 'ほんのり光るようになった', 'きらきら光るようになった', '金色になった', '虹の軌跡を残すようになった', '星をまとうようになった', '光の柱が立つようになった', '虹色になった', '伝説の鉛筆になった'];
+  const shineOf = n => { let t = 0; for (const x of SHINE) if (n >= x) t++; return t; };
+  const myShine = () => shineOf(ME.dead);   // 層ごとの、自分がいちばん先まで行った割合（0〜1000）
   const saveMe = () => N.store('el_me', ME);
   // ---------- 鉛筆の名前 ----------
   const NAMES = {
@@ -90,6 +96,7 @@
       setBar('tFr', fr, W.done || ME.bp[L] === undefined ? -1 : ME.bp[L] | 0, T('先頭 {0}%', Math.floor(fr / 10))); }
     $('tDead').textContent = T('{0}本', fmt(W.dead));
     $('tMine').textContent = T('{0}本', fmt(ME.dead));
+    { const tr = myShine(), nx = SHINE[tr]; $('tShine').textContent = (tr ? T('鉛筆の輝き：{0}', T(SHINE_NAME[tr])) : T('鉛筆の輝き：まだなし')) + (nx ? ' ' + T('（あと{0}本で「{1}」）', fmt(nx - ME.dead), T(SHINE_NAME[tr + 1])) : ''); }
     $('tNote').textContent = OFFLINE ? T('いまは一人で遊んでいます（みんなの鉛筆は出ません）') : (W.end ? T('ゲームは終わりました。鉛筆はもう増えません') : T('鉛筆は20秒ごとに、みんなのものが届きます'));
     paintSnd();
     const box = $('langs'); box.innerHTML = '';
@@ -172,22 +179,26 @@
     const r = S.run, lv = S.lv;
     if (r.clear) return onClear();
     const pl = r.place || { k: -1, why: 'out' };
+    const tierBefore = shineOf(ME.dead);
     ME.dead++; saveMe();
+    const tier = shineOf(ME.dead), up = tier > tierBefore ? tier : 0;
     const m = Math.max(0, Math.min(1000, Math.round((r.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 1000)));
     if (m > (ME.bp[lv.f] | 0)) { ME.bp[lv.f] = m; saveMe(); }
     let count = (W.stat[lv.f] && W.stat[lv.f].d) || 0; count = Math.max(count, countPencils()) + 1;
     if (pl.k >= 0) {
-      const c = { n: pl.n, name: S.name, t: Date.now() };
+      const prev = S.cor.get(pl.k), below = Math.max(0, pl.n - 1);
+      const c = { n: pl.n, name: S.name, t: Date.now(), sh: ((prev && prev.sh) || '').padEnd(below, '0').slice(0, below) + tier.toString(36) };
       S.cor.set(pl.k, c); S.mine.set(pl.k, c);
       if (OFFLINE) saveLocalCor(lv.f, S.cor);
-      else N.died({ f: lv.f, k: pl.k, n: pl.n, cap: FT.capOf(lv, pl.k), name: S.name, rec: S.rec.str(), cor: S.start, ticks: r.t, m }).catch(() => { });
+      else N.died({ f: lv.f, k: pl.k, n: pl.n, s: tier, cap: FT.capOf(lv, pl.k), name: S.name, rec: S.rec.str(), cor: S.start, ticks: r.t, m }).catch(() => { });
       fxStick(pl);
     } else {
       if (!OFFLINE) N.statOnly(lv.f, m).catch(() => { });
       fxBreak(r, pl);
     }
     W.stat[lv.f] = Object.assign({}, W.stat[lv.f] || {}, { d: count });
-    S.deadInfo = { why: pl.why, kind: r.dead, k: pl.k, n: pl.n, count, name: S.name, f: lv.f, rec: S.rec.str(), start: S.start, ticks: r.t, startCor: S.startCor };
+    S.deadInfo = { why: pl.why, kind: r.dead, k: pl.k, n: pl.n, count, name: S.name, f: lv.f, rec: S.rec.str(), start: S.start, ticks: r.t, startCor: S.startCor, up };
+    if (up) { const p = r.p; for (let i = 0; i < 36; i++) S.fx.push({ k: 'chip', x: p.x, y: p.y, vx: (Math.random() - .5) * 10, vy: -Math.random() * 10, t: 0, d: 1.5, c: ['#ffe066', '#fff3b0', '#ffd23f', '#ffffff'][i % 4] }); S.fx.push({ k: 'pop', x: p.x, y: p.y - 1.4, t: 0, d: 1.6, txt: T('輝きが増した！') }); }
     S.mode = 'dead'; hud(); if (S.pvEv) S.pvEv.push(pl.k >= 0 ? 'stick' : 'break');
     SND.se(pl.k >= 0 ? (pl.why === 'stack' ? 'pile' : 'land') : (pl.why === 'sink' ? 'splash' : 'die'));
     setTimeout(showDead, pl.k >= 0 ? 650 : 800);
@@ -204,6 +215,7 @@
     $('dWhy').textContent = T(WHY[d.why === 'shatter' ? d.kind : d.why] || WHY.out);
     $('dName').innerHTML = `<b>${esc(d.name)}</b>`;
     $('dMore').textContent = made ? T('この鉛筆は、あとから来るだれかの足場になる。') : T('トゲ・刃・のりの上には、鉛筆が残りません。');
+    const up = $('dUp'); if (d.up) { up.hidden = false; up.textContent = '✨ ' + T('{0}本目！ 鉛筆が{1}', fmt(SHINE[d.up - 1]), T(SHINE_MSG[d.up])); } else up.hidden = true;
     ov('oDead', 1);
   }
   async function onClear() {
@@ -476,7 +488,7 @@
       if (cxw < ox - 2 || cxw > ox + W2 / s + 2) continue;
       const ghost = r && !runCor.has(k) && (S.mode === 'play' || S.mode === 'watch');
       const capN = lv.cap[Math.floor(cxw)] | 0;
-      for (let i = 0, nn = Math.min(30, c.n, FT.capOf(lv, k)); i < nn; i++) drawPencil(g, X(cxw), Y(sy - i * PH.PH), s, k * 7 + i, 0, ghost ? .35 : 1, ink, false);
+      for (let i = 0, nn = Math.min(30, c.n, FT.capOf(lv, k)); i < nn; i++) drawPencil(g, X(cxw), Y(sy - i * PH.PH), s, k * 7 + i, 0, ghost ? .35 : 1, ink, false, 0, c.sh ? (parseInt(c.sh[i] || '0', 36) || 0) : 0);
       if (capN > 0 && c.n >= Math.max(1, capN - 1)) { const ly = Y(sy - capN * PH.PH); g.strokeStyle = c.n >= capN ? 'rgba(224,60,50,.95)' : 'rgba(224,60,50,.5)'; g.lineWidth = Math.max(2, s * .09); g.setLineDash([s * .16, s * .1]); g.beginPath(); g.moveTo(X(cxw - .45), ly); g.lineTo(X(cxw + .45), ly); g.stroke(); g.setLineDash([]); }
     }
     if (S.mode === 'spec' && SP.d) drawSpecMark(g, X, Y, s, ink, t);
@@ -491,24 +503,35 @@
     }
     // 飛んだあとの線
     if (r && S.trail.length > 1 && (r.p.fly || S.mode !== 'play')) {
-      g.strokeStyle = th === 2 || th === 7 ? 'rgba(255,255,255,.35)' : 'rgba(43,43,51,.25)'; g.lineWidth = Math.max(1, s * .05); g.beginPath(); g.moveTo(X(S.trail[0][0]), Y(S.trail[0][1])); for (const q of S.trail) g.lineTo(X(q[0]), Y(q[1])); g.stroke();
+      if (S.mode === 'play' && myShine() >= 4) {
+        // 虹の軌跡（4段から）
+        g.lineWidth = Math.max(2, s * .12); g.lineCap = 'round';
+        for (let i = 1; i < S.trail.length; i++) { g.strokeStyle = `hsla(${(i * 14 + t * 160) % 360},90%,62%,${.25 + .6 * i / S.trail.length})`; g.beginPath(); g.moveTo(X(S.trail[i - 1][0]), Y(S.trail[i - 1][1])); g.lineTo(X(S.trail[i][0]), Y(S.trail[i][1])); g.stroke(); }
+        g.lineCap = 'butt';
+      } else { g.strokeStyle = th === 2 || th === 7 ? 'rgba(255,255,255,.35)' : 'rgba(43,43,51,.25)'; g.lineWidth = Math.max(1, s * .05); g.beginPath(); g.moveTo(X(S.trail[0][0]), Y(S.trail[0][1])); for (const q of S.trail) g.lineTo(X(q[0]), Y(q[1])); g.stroke(); }
     }
     // 自分
     if (r && !(S.mode !== 'play' && r.place && r.place.k >= 0)) {
       const p = r.p; let ang = 0;
       if (p.fly) ang = Math.atan2(p.vx, -p.vy);
       else if (S.aim) ang = S.aim.deg * Math.PI / 180 * .5;
-      if (S.mode === 'play' || S.mode === 'watch' || r.clear) drawPencil(g, X(p.x), Y(p.y + PH.HB), s, 999 + S.life, ang, 1, ink, true, p.fly ? t : 0);
+      if (S.mode === 'play' || S.mode === 'watch' || r.clear) drawPencil(g, X(p.x), Y(p.y + PH.HB), s, 999 + S.life, ang, 1, ink, true, p.fly ? t : 0, S.mode === 'watch' ? 0 : myShine());
     }
     // 演出
     drawFx(g, X, Y, s, t);
     if (opt.label) { g.setTransform(dp, 0, 0, dp, 0, 0); opt.label(g); }
   }
   // 鉛筆1本（下のはしを x, y に置く。ang：傾き。me：自分）
-  function drawPencil(g, x, y, s, seed, ang, alpha, ink, me, fly) {
+  function drawPencil(g, x, y, s, seed, ang, alpha, ink, me, fly, tier) {
     const w = s * .34, h = s * PH.PH, cols = ['#f5c84c', '#4f9be0', '#e65f4f', '#5cbf6a', '#b07cd8', '#ff9f43', '#ff8fab', '#7ad0c4'];
-    const col = me ? '#f5c84c' : cols[Math.floor(hash(seed, 3) * cols.length)];
+    tier = tier | 0;
+    const tt = performance.now() / 1000;
+    let col = me ? '#f5c84c' : cols[Math.floor(hash(seed, 3) * cols.length)];
     g.save(); g.globalAlpha = alpha; g.translate(x, y); g.rotate(ang);
+    if (tier > 0 && alpha > .5) shineBack(g, s, w, h, tier, seed, tt);
+    // 金色（3段から）・虹色（7段から）
+    if (tier >= 7) col = `hsl(${(tt * 70 + seed * 37) % 360},85%,62%)`;
+    else if (tier >= 3) { const gd = g.createLinearGradient(-w / 2, 0, w / 2, 0); gd.addColorStop(0, '#d99a00'); gd.addColorStop(.5, '#ffe27a'); gd.addColorStop(1, '#d99a00'); col = gd; }
     // 飛んでいる：うしろに削りカスの火花
     if (fly) { for (let i = 0; i < 5; i++) { const k = (fly * 7 + i * .2) % 1; g.fillStyle = i % 2 ? '#e0483e' : '#f2b134'; g.beginPath(); g.arc(jit(i, fly * 30 | 0, w), s * .1 + k * s * .5, (1 - k) * s * .09, 0, 7); g.fill(); } }
     // 体（透明なつつ）
@@ -519,8 +542,36 @@
     g.fillStyle = '#f2d3a2'; g.beginPath(); g.moveTo(-w / 2, -h * .62); g.lineTo(0, -h); g.lineTo(w / 2, -h * .62); g.closePath(); g.fill(); g.stroke();
     g.fillStyle = '#3a3a44'; g.beginPath(); g.moveTo(-w * .17, -h * .87); g.lineTo(0, -h); g.lineTo(w * .17, -h * .87); g.closePath(); g.fill();
     if (me && !fly) { g.fillStyle = ink; g.beginPath(); g.arc(-w * .14, -h * .36, s * .03, 0, 7); g.arc(w * .14, -h * .36, s * .03, 0, 7); g.fill(); }
+    if (tier > 0 && alpha > .5) shineFront(g, s, w, h, tier, seed, tt);
     g.restore();
   }
+  // 輝きの光（段ごとに1枚だけ作っておき、大きさを変えて貼る。たくさんあっても重くならないように）
+  const GLOW = {};
+  function glowSprite(tier) {
+    if (GLOW[tier]) return GLOW[tier];
+    const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+    const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32), col = tier >= 7 ? '255,190,240' : tier >= 3 ? '255,210,80' : '255,236,150', a = Math.min(.82, .46 + tier * .05);
+    gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(.5, `rgba(${col},${a * .45})`); gr.addColorStop(1, `rgba(${col},0)`);
+    x.fillStyle = gr; x.fillRect(0, 0, 64, 64); return (GLOW[tier] = c);
+  }
+  function shineBack(g, s, w, h, tier, seed, tt) {
+    const cy = -h * .5, R = s * (.62 + tier * .12) * (1 + .07 * Math.sin(tt * 3 + seed));
+    g.drawImage(glowSprite(tier), -R, cy - R, R * 2, R * 2);
+    // 光の柱（6段から）
+    if (tier >= 6) { const lg = g.createLinearGradient(0, -h, 0, -h - s * 2.4); lg.addColorStop(0, 'rgba(255,244,180,.6)'); lg.addColorStop(1, 'rgba(255,244,180,0)'); g.fillStyle = lg; g.fillRect(-w * .42, -h - s * 2.4, w * .84, s * 2.4); }
+    // 虹の輪（4段から）
+    if (tier >= 4) { g.strokeStyle = `hsla(${(tt * 90 + seed * 50) % 360},90%,65%,.65)`; g.lineWidth = Math.max(1.5, s * .05); g.beginPath(); g.ellipse(0, cy, w * 1.35, h * .62, 0, 0, 7); g.stroke(); }
+  }
+  function shineFront(g, s, w, h, tier, seed, tt) {
+    const cy = -h * .5;
+    // きらきら（2段から。段が上がるほど多い）
+    if (tier >= 2) for (let j = 0; j < Math.min(6, tier); j++) { const ph = (tt * .8 + hash(seed, j + 5)) % 1, a = Math.sin(ph * Math.PI); if (a < .15) continue; star4(g, (hash(seed, j + 11) - .5) * s * 1.15, cy + (hash(seed, j + 17) - .5) * h * 1.15, s * .085 * a, `rgba(255,255,255,${a})`); }
+    // 星をまとう（5段から：まわりを回る星）
+    if (tier >= 5) for (let j = 0; j < 2; j++) { const an = tt * 2.2 + j * Math.PI + seed; star4(g, Math.cos(an) * w * 1.25, cy + Math.sin(an) * h * .45, s * .1, '#ffe066'); }
+    // 冠（8段：伝説）
+    if (tier >= 8) { const y0 = -h - s * .1, cw = w * .95; g.fillStyle = '#ffd23f'; g.strokeStyle = '#a77b00'; g.lineWidth = Math.max(1, s * .03); g.beginPath(); g.moveTo(-cw / 2, y0); g.lineTo(-cw / 2, y0 - s * .17); g.lineTo(-cw / 4, y0 - s * .08); g.lineTo(0, y0 - s * .22); g.lineTo(cw / 4, y0 - s * .08); g.lineTo(cw / 2, y0 - s * .17); g.lineTo(cw / 2, y0); g.closePath(); g.fill(); g.stroke(); }
+  }
+  function star4(g, x, y, r, col) { g.fillStyle = col; g.beginPath(); g.moveTo(x, y - r * 2); g.lineTo(x + r * .45, y - r * .45); g.lineTo(x + r * 2, y); g.lineTo(x + r * .45, y + r * .45); g.lineTo(x, y + r * 2); g.lineTo(x - r * .45, y + r * .45); g.lineTo(x - r * 2, y); g.lineTo(x - r * .45, y - r * .45); g.closePath(); g.fill(); }
   function drawGoal(g, X, Y, s, lv, t, ink) {
     const [gx, gy, gw, gh] = lv.goal, x = X(gx + .2), y = Y(gy + gh), w = 3 * s;
     // 中に入っている鉛筆

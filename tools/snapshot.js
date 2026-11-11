@@ -49,7 +49,7 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
       for (const k in v || {}) if (v[k]) raw[k] = { n: v[k].n, l: v[k].l, t: v[k].t };
       const items = V.newItems(st, await rest('dlog/' + f, { orderBy: 't', startAt: st.t }));
       await V.advance(floors[f - 1], st, raw, items, id => rest('drec/' + f + '/' + id), { ms: Math.max(1000, LIMIT - (Date.now() - T0)) });
-      const out = { at, ver: SVER, f, rmKey, d: (STAT[f] && STAT[f].d) || 0, raw, st: { t: st.t, ti: st.ti, P: st.P, bad: st.bad } };
+      const out = { at, ver: SVER, f, rmKey, d: (STAT[f] && STAT[f].d) || 0, raw, st: { t: st.t, ti: st.ti, P: st.P, bad: st.bad, S: st.S || {} } };
       fs.writeFileSync(file, JSON.stringify(out)); idx.floors[f] = at;
       states[f] = { st, raw };
     } else if (prev) states[f] = { st: prev.st, raw: prev.raw };

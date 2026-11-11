@@ -46,7 +46,7 @@
   };
   // まとめて確かめる。budget：計算する動きの量
   V.verifyDeaths = function (lv, items, present, bad, budget) {
-    const add = [], badInc = {}; let i = 0;
+    const add = [], addS = [], badInc = {}; let i = 0;
     present = Object.assign({}, present);
     for (; i < items.length; i++) {
       const it = items[i];
@@ -55,10 +55,10 @@
       if (!(it.k <= V.DMAX)) continue;
       budget -= Math.max(1, it.k | 0);
       const res = V.verifyDeath(lv, it, present);
-      if (res === 'ok') { present[it.p] = (present[it.p] || 0) + 1; add.push(it.p); }
+      if (res === 'ok') { present[it.p] = (present[it.p] || 0) + 1; add.push(it.p); addS.push(Math.max(0, Math.min(8, it.s | 0))); }
       else if (res === 'replay') badInc[it.u] = (badInc[it.u] || 0) + 1;
     }
-    return { done: i, add, badInc };
+    return { done: i, add, addS, badInc };
   };
   // データベースにある鉛筆の数（{ 場所: 本数 }・30本まで）
   V.dbOf = raw => { const o = {}; for (const k in raw || {}) { const c = raw[k]; if (c) o[k] = Math.min(30, c.n | 0 || 1); } return o; };
@@ -93,7 +93,9 @@
       const res = opt.run ? await opt.run(lv, part, present, st.bad, 120 * 60 * 20) : V.verifyDeaths(lv, part, present, st.bad, 120 * 60 * 20);
       if (!res || !(res.done >= 0)) break;
       for (const u in res.badInc) st.bad[u] = (st.bad[u] || 0) + res.badInc[u];
-      for (const p of res.add) st.P[p] = (st.P[p] || 0) + 1;
+      // 確かめた鉛筆の数と、それぞれの輝き（S：場所ごとに、下から順の輝きの文字列。0〜8）
+      st.S = st.S || {};
+      res.add.forEach((p, j) => { st.P[p] = (st.P[p] || 0) + 1; st.S[p] = ((st.S[p] || '') + ((res.addS && res.addS[j]) | 0).toString(36)).slice(0, 30); });
       for (let j = 0; j < res.done; j++) { const d = part[j]; if (d.t !== st.t) { st.t = d.t; st.ti = []; } st.ti.push(d.id); }
       i += res.done;
       if (opt.save) opt.save(st);
@@ -106,10 +108,16 @@
   // 見せる鉛筆：確かめた鉛筆 ＋ まだ確かめていない鉛筆（だめな記録の多いIDの分は見せない）
   V.shown = (st, raw, rest, lv) => {
     const out = new Map();
-    const pend = {};
-    for (const d of rest || []) if ((st.bad[d.u] || 0) < 3) pend[d.p] = (pend[d.p] || 0) + 1;
+    const pend = {}, pendS = {};
+    for (const d of rest || []) if ((st.bad[d.u] || 0) < 3) { pend[d.p] = (pend[d.p] || 0) + 1; pendS[d.p] = (pendS[d.p] || '') + (Math.max(0, Math.min(8, d.s | 0))).toString(36); }
     const keys = new Set([...Object.keys(st.P), ...Object.keys(pend)]);
-    for (const k of keys) { const c = raw[k]; if (!c || !FT.keyOk(lv, +k)) continue; const n = Math.min(30, c.n | 0 || 1, (st.P[k] || 0) + (pend[k] || 0), FT.capOf(lv, +k)); if (n > 0) out.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); }
+    for (const k of keys) {
+      const c = raw[k]; if (!c || !FT.keyOk(lv, +k)) continue;
+      const n = Math.min(30, c.n | 0 || 1, (st.P[k] || 0) + (pend[k] || 0), FT.capOf(lv, +k));
+      // sh：下から順の、鉛筆ごとの輝き（確かめた分のあとに、確かめ中の分）
+      const sh = (((st.S && st.S[k]) || '').padEnd(st.P[k] || 0, '0') + (pendS[k] || '')).slice(0, n);
+      if (n > 0) out.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0, sh });
+    }
     return out;
   };
 })(typeof window !== 'undefined' ? window : globalThis);

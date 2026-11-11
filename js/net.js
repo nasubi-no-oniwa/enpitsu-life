@@ -197,7 +197,7 @@
       try { const v = await rest('cells/' + lv.f, { orderBy: 't', startAt: F.maxT + 1 }); for (const k in v || {}) { if (!v[k]) continue; F.raw[k] = v[k]; if (v[k].t > F.maxT) F.maxT = v[k].t; } } catch (e) { }
     }
     const m = V.shown(F.st, F.raw, F.rest, lv);
-    for (const k in F.raw) { const c = F.raw[k]; if (c && c.t > (F.st.t || 0) - 1) { const n = Math.min(30, c.n | 0 || 1, FT.capOf(lv, +k)); if (n <= 0 || !FT.keyOk(lv, +k)) continue; const cur = m.get(+k); if (!cur || cur.n < n) m.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); } }
+    for (const k in F.raw) { const c = F.raw[k]; if (c && c.t > (F.st.t || 0) - 1) { const n = Math.min(30, c.n | 0 || 1, FT.capOf(lv, +k)); if (n <= 0 || !FT.keyOk(lv, +k)) continue; const cur = m.get(+k); if (!cur || cur.n < n) m.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0, sh: (cur && cur.sh) || (c.s ? (c.s | 0).toString(36) : '') }); } }
     for (const [k, c] of mine || []) { const n = Math.min(c.n | 0, FT.capOf(lv, k)); if (n <= 0 || !FT.keyOk(lv, k)) continue; const cur = m.get(k); if (!cur || cur.n < n) m.set(k, Object.assign({}, c, { n })); }
     return m;
   };
@@ -234,9 +234,10 @@
         per[e.f] = per[e.f] || { d: 0, m: 0 }; per[e.f].d++; per[e.f].m = Math.max(per[e.f].m, e.m | 0);
         if (e.k < 0) continue;
         const g = pid(), cp = 'cells/' + e.f + '/' + e.k; e.g = g;
+        const sh = Math.max(0, Math.min(8, e.s | 0));   // 鉛筆の輝き（死んだ回数の節目）
         if (e.n > 1) { w[cp + '/n'] = INC(); w[cp + '/t'] = SV; w[cp + '/g'] = g; }
-        else w[cp] = { n: INC(), s: 0, l: N.cleanName(e.name) || '名無し', t: SV, g };
-        w['dlog/' + e.f + '/' + g] = { p: String(e.k), u: uid, t: SV, v: 1, s: 0, b: 0 };
+        else w[cp] = { n: INC(), s: sh, l: N.cleanName(e.name) || '名無し', t: SV, g };
+        w['dlog/' + e.f + '/' + g] = { p: String(e.k), u: uid, t: SV, v: 1, s: sh, b: 0 };
         w['drec/' + e.f + '/' + g] = { r: String(e.rec || '').slice(0, 30000), c: String(e.cor || '').slice(0, 30000), k: Math.max(1, e.ticks | 0) };
       }
       for (const f in per) { w['stat/' + f + '/d'] = INC(per[f].d); if (per[f].m > (N.mKnown[f] || 0)) w['stat/' + f + '/m'] = Math.min(1000, per[f].m); }
@@ -250,7 +251,7 @@
           // もう赤い線（またはデータベースの上限30本）まで積まれている山：この鉛筆は残らないので送らない（ほかの記録までまとめて断られないように）
           await Promise.all(batch.filter(e2 => e2.k >= 0 && !e2.drop).map(async e2 => { const cp = 'cells/' + e2.f + '/' + e2.k; const ex = await rest(cp + '/n').catch(() => null); if (typeof ex === 'number' && ex + 1 > Math.min(30, e2.cap || 30)) { e2.drop = true; for (const kk of Object.keys(w)) if (kk === cp || kk.startsWith(cp + '/')) delete w[kk]; const g = Object.keys(w).find(kk => kk.startsWith('dlog/' + e2.f + '/') && w[kk] && w[kk].p === String(e2.k)); if (g) { const id = g.split('/')[2]; delete w['dlog/' + e2.f + '/' + id]; delete w['drec/' + e2.f + '/' + id]; } } }));
           // 積み重ねのつもりが、その山がもうない（管理人が取り除いた）→ 新しい山として送る
-          await Promise.all(batch.filter(e2 => e2.k >= 0 && w['cells/' + e2.f + '/' + e2.k + '/n']).map(async e2 => { const cp = 'cells/' + e2.f + '/' + e2.k; const ex = await rest(cp + '/n').catch(() => 1); if (ex === null) { const g = w[cp + '/g']; delete w[cp + '/n']; delete w[cp + '/t']; delete w[cp + '/g']; w[cp] = { n: INC(), s: 0, l: N.cleanName(e2.name) || '名無し', t: SV, g }; } }));
+          await Promise.all(batch.filter(e2 => e2.k >= 0 && w['cells/' + e2.f + '/' + e2.k + '/n']).map(async e2 => { const cp = 'cells/' + e2.f + '/' + e2.k; const ex = await rest(cp + '/n').catch(() => 1); if (ex === null) { const g = w[cp + '/g']; delete w[cp + '/n']; delete w[cp + '/t']; delete w[cp + '/g']; w[cp] = { n: INC(), s: Math.max(0, Math.min(8, e2.s | 0)), l: N.cleanName(e2.name) || '名無し', t: SV, g }; } }));
           for (const f in per) delete w['stat/' + f + '/m'];
           await sleep(900 + Math.random() * 600);
           w['u/' + uid + '/c'] = SV;
