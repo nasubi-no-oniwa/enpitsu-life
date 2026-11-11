@@ -36,7 +36,7 @@ http.createServer((req, res) => {
         if (lf) ents = ents.slice(0, +lf); if (ll) ents = ents.slice(-ll);
         v = Object.fromEntries(ents);
       }
-      return send(200, v === undefined ? null : v);
+      return send(200, JSON.stringify(v === undefined ? null : v));   // 文字の値も、本物と同じく JSON で返す
     }
     stats.write++;
     let val; try { val = JSON.parse(String(body).replace(/\{"\.sv":"timestamp"\}/g, String(db.now))); } catch (e) { return send(400, { error: 'json' }); }

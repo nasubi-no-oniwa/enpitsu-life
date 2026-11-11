@@ -216,16 +216,24 @@
   N.statOnly = function (f, m) { return N.died({ f, k: -1, m }); };
   async function flush() {
     qT = 0; if (qBusy || !Q.length) return; qBusy = true;
+    let netFail = 0;
     try {
       const wait = lastC + 800 - Date.now(); if (wait > 0) await sleep(wait);
       await N.token();
       const uid = N.uid(), batch = [], seen = new Set();
+      // 前に送ったのに返事が来なかった記録：もう届いていたら送りなおさない（同じ鉛筆が2本にならないように）
+      for (const e of Q.slice(0, 12)) {
+        if (!e.g || !(e.k >= 0)) continue;
+        const u = await rest('dlog/' + e.f + '/' + e.g + '/u');   // 通信がまだだめなら、ここで外へ（あとで送りなおす）
+        if (u === uid) { Q.splice(Q.indexOf(e), 1); e.res(true); } else e.g = null;
+      }
+      if (!Q.length) return;
       for (const e of Q) { if (batch.length >= 6) break; const key = e.f + ':' + e.k; if (e.k >= 0 && seen.has(key)) continue; seen.add(key); batch.push(e); }
       const w = { ['u/' + uid + '/c']: SV }, per = {};
       for (const e of batch) {
         per[e.f] = per[e.f] || { d: 0, m: 0 }; per[e.f].d++; per[e.f].m = Math.max(per[e.f].m, e.m | 0);
         if (e.k < 0) continue;
-        const g = pid(), cp = 'cells/' + e.f + '/' + e.k;
+        const g = pid(), cp = 'cells/' + e.f + '/' + e.k; e.g = g;
         if (e.n > 1) { w[cp + '/n'] = INC(); w[cp + '/t'] = SV; w[cp + '/g'] = g; }
         else w[cp] = { n: INC(), s: 0, l: N.cleanName(e.name) || '名無し', t: SV, g };
         w['dlog/' + e.f + '/' + g] = { p: String(e.k), u: uid, t: SV, v: 1, s: 0, b: 0 };
@@ -249,11 +257,19 @@
         }
       }
       lastC = Date.now();
-      for (const e of batch) { Q.splice(Q.indexOf(e), 1); if (ok) e.res(!e.drop); else e.rej(err || new Error('send')); }
-      if (ok) for (const f in per) N.mKnown[f] = Math.max(N.mKnown[f] || 0, per[f].m);
+      if (!ok && !perm(err)) {
+        // 通信が切れた・返事が来ない：捨てずに、少し待って送りなおす（届いていたかは、次に送る前に確かめる）
+        for (const e of batch) { e.tries = (e.tries || 0) + 1; if (e.tries >= 6) { Q.splice(Q.indexOf(e), 1); e.rej(err || new Error('send')); } }
+        netFail = Math.max(1, ...batch.map(e => e.tries || 1));
+      } else {
+        for (const e of batch) { Q.splice(Q.indexOf(e), 1); if (ok) e.res(!e.drop); else e.rej(err || new Error('send')); }
+        if (ok) for (const f in per) N.mKnown[f] = Math.max(N.mKnown[f] || 0, per[f].m);
+      }
     } catch (e) {
-      for (const x of Q.splice(0, Math.min(Q.length, 6))) x.rej(e);
-    } finally { qBusy = false; if (Q.length) qT = setTimeout(flush, 1000); }
+      // 鍵が取れない・通信がだめ：これも、あとで送りなおす
+      for (const x of Q.slice(0, 6)) { x.tries = (x.tries || 0) + 1; if (x.tries >= 6) { Q.splice(Q.indexOf(x), 1); x.rej(e); } }
+      netFail = 3;
+    } finally { qBusy = false; if (Q.length) qT = setTimeout(flush, netFail ? Math.min(30000, 1000 * Math.pow(2, netFail)) : 1000); }
   }
   N.mKnown = {};
   // =============================================

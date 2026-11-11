@@ -84,6 +84,25 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   const ak = await fetch(`http://127.0.0.1:${PORT}/el/ask.json?ns=g`); ok(ak.status === 401, 'ふつうの人は、相談を読めない');
   await NB.resetFloor(1).then(() => ok(false, 'ふつうの人が層を消せてしまった')).catch(() => ok(true, 'ふつうの人は層を消せない'));
   await NB.liveAdd('だれか', 'https://example.com/x', '').then(() => ok(false, 'ふつうの人が配信中を書けてしまった')).catch(() => ok(true, 'ふつうの人は配信中を書けない'));
+  console.log('4b) 通信が切れても鉛筆を捨てない・同じ鉛筆を2本にしない');
+  {
+    const lv2 = FT.makeLevel(levels[1]), spots = [];
+    for (let pw = 300; pw <= 1000 && spots.length < 2; pw += 50) { const x = life(FT, lv2, new Map(), 150, pw); if (x.r.place && x.r.place.why === 'ground' && !spots.some(y => y.r.place.k === x.r.place.k)) spots.push(x); }
+    // C：送ったが返事が来なかった（データベースには届いている）→ 届いていたと分かって送りなおさない
+    const C = client('C'), NC = C.FT.NET, F0 = C.fetch; let cut = 1;
+    C.fetch = async (u, o) => { const r = await F0(u, o); if (o && o.method === 'PATCH' && cut > 0) { cut--; throw new TypeError('network'); } return r; };
+    await NC.loadCells(C.FT.makeLevel(levels[1]));
+    const a = spots[0]; const ra = await Promise.race([NC.died({ f: 2, k: a.r.place.k, n: 1, name: 'しーHB', rec: a.rec, cor: '', ticks: a.r.t, m: 100 }).then(v => v, e => 'rej ' + e.message), (NC.flush(), sleep(20000).then(() => 'timeout'))]);
+    const ca = await get('el/cells/2/' + a.r.place.k);
+    ok(ra === true && ca && ca.n === 1, '返事が来なくても、同じ鉛筆を2本にしない ' + JSON.stringify([ra, ca && ca.n]));
+    // D：送る前に通信が切れた → 捨てずに、あとで送りなおす
+    const D = client('D'), ND = D.FT.NET, F1 = D.fetch; let cut2 = 1;
+    D.fetch = async (u, o) => { if (o && o.method === 'PATCH' && cut2 > 0) { cut2--; throw new TypeError('offline'); } return F1(u, o); };
+    await ND.loadCells(D.FT.makeLevel(levels[1]));
+    const b2 = spots[1]; const rb = await Promise.race([ND.died({ f: 2, k: b2.r.place.k, n: 1, name: 'でぃーHB', rec: b2.rec, cor: '', ticks: b2.r.t, m: 100 }).then(v => v, e => 'rej ' + e.message), (ND.flush(), sleep(20000).then(() => 'timeout'))]);
+    const cb = await get('el/cells/2/' + b2.r.place.k);
+    ok(rb === true && cb && cb.n === 1, '通信が切れても、あとで送りなおして届く ' + JSON.stringify([rb, cb && cb.n]));
+  }
   console.log('5) 管理人');
   await fetch(`http://127.0.0.1:${PORT}/ft_admin/key.json?ns=g`, { method: 'PUT', body: '"KEY"' });
   await NA.adminLogin('KEY').then(() => ok(true, '管理のかぎで入れた')).catch(e => ok(false, '管理のかぎで入れない ' + e.message));
