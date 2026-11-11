@@ -12,7 +12,7 @@
 //   u/{匿名ID}          : { c：最後に死んだ時刻, k：最後に越えた時刻, p：最後に書いた時刻, r：最後の詰みの知らせ, w/{層} }
 //   rm/{層}・reset/{層} : { t }   管理人が鉛筆を取り除いた・層を消した時刻
 //   board/{番号}       : 掲示板 { n, m, t, u, s：0, l：言葉, f：いちばん先の層 }   pin：管理人のお知らせ
-//   live/{番号}        : 配信中の人   rep/{層}/{番号}：詰みの知らせ（管理人だけ読める）
+//   live/{番号}        : 配信中の人   rep/{層}/{番号}：詰みの知らせ   ask/{番号}：管理人への相談（どちらも管理人だけ読める）
 //   ckpt               : 管理人が「ここまでは本物」と確かめた層
 //  管理のかぎは Fairies' Tower と同じ（ft_admin/key・ft_admins）
 //
@@ -318,6 +318,15 @@
   N.reports = async function () { const v = await restMe('rep'); return v || {}; };
   N.repSeen = (f, t) => update({ ['repok/' + f]: t });
   N.repDel = f => update({ ['rep/' + f]: null });
+  // =============================================
+  //  管理人への相談（ask/{番号}：{ t, u, m：文, x：XのID, l：言葉, f：最前線の層 }。読めるのは管理人だけ。1人1分に1回まで）
+  // =============================================
+  N.ask = async function (m, x, l, f) {
+    await N.token(); const uid = N.uid();
+    await update({ ['u/' + uid + '/a']: SV, ['ask/' + pid()]: { t: SV, u: uid, m: String(m || '').slice(0, 300), x: N.cleanX(x), l: l || 'ja', f: Math.max(0, Math.min(101, f | 0)) } });
+  };
+  N.asks = async function () { const v = await restMe('ask'); return v || {}; };
+  N.askDel = id => update({ ['ask/' + id]: null });
   // =============================================
   //  配信中の人（live/{id}：{ n：名前, u：配信のURL, m：ひとこと, t }。書けるのは管理人だけ）
   // =============================================

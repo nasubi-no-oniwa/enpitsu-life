@@ -68,11 +68,18 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   const bd = await NB.boardRead('all', 0); ok(bd.length === 1 && bd[0].m === 'がんばろう', '掲示板を読めた');
   await NB.report(1, 300, '越えられる（あと2本で届いた）', 'ja').then(() => ok(true, '詰みの知らせを送れた')).catch(e => ok(false, '詰みの知らせを送れない ' + e.message));
   const rp = await fetch(`http://127.0.0.1:${PORT}/el/rep.json?ns=g`); ok(rp.status === 401, 'ふつうの人は、詰みの知らせを読めない');
+  await NB.ask('第3層の右の壁が高すぎる気がします', 'nasubiP', 'ja', 3).then(() => ok(true, '管理人への相談を送れた')).catch(e => ok(false, '相談を送れない ' + e.message));
+  await sleep(300);
+  await NB.ask('もう1回', '', 'ja', 3).then(() => ok(false, '1分たたずに2回目の相談が送れてしまった')).catch(() => ok(true, '相談は1分に1回まで'));
+  const ak = await fetch(`http://127.0.0.1:${PORT}/el/ask.json?ns=g`); ok(ak.status === 401, 'ふつうの人は、相談を読めない');
   await NB.resetFloor(1).then(() => ok(false, 'ふつうの人が層を消せてしまった')).catch(() => ok(true, 'ふつうの人は層を消せない'));
   await NB.liveAdd('だれか', 'https://example.com/x', '').then(() => ok(false, 'ふつうの人が配信中を書けてしまった')).catch(() => ok(true, 'ふつうの人は配信中を書けない'));
   console.log('5) 管理人');
   await fetch(`http://127.0.0.1:${PORT}/ft_admin/key.json?ns=g`, { method: 'PUT', body: '"KEY"' });
   await NA.adminLogin('KEY').then(() => ok(true, '管理のかぎで入れた')).catch(e => ok(false, '管理のかぎで入れない ' + e.message));
+  const asks = await NA.asks().catch(() => null); const aid = asks && Object.keys(asks)[0];
+  ok(asks && Object.keys(asks).length === 1 && asks[aid].x === 'nasubiP' && asks[aid].f === 3, '管理人は相談を読める');
+  await NA.askDel(aid).then(() => ok(true, '管理人は相談を消せる')).catch(e => ok(false, '相談を消せない ' + e.message));
   const reps = await NA.reports().catch(() => null); ok(reps && reps[1] && Object.keys(reps[1]).length === 1, '管理人は詰みの知らせを読める');
   await NA.liveAdd('なすP', 'https://youtube.com/live/abc', 'いま配信中').then(() => ok(true, '配信中を書けた')).catch(e => ok(false, '配信中を書けない ' + e.message));
   const lv = await NB.live(); ok(lv.length === 1, 'みんなが配信中を読める');
@@ -83,6 +90,8 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   await NA.setEnd().then(() => ok(true, 'ゲームを終えられた')).catch(e => ok(false, '終えられない ' + e.message));
   await sleep(900);
   await NB.boardPost('all', { n: 'びーさん', m: 'まだ書ける？', l: 'ja', f: 1 }).then(() => ok(false, '終わったあとも書けてしまった')).catch(() => ok(true, '終わったあとは書けない'));
+  await sleep(61000 - 300);
+  await NB.ask('終わったあとの相談', '', 'ja', 101).then(() => ok(true, '終わったあとも相談は送れる')).catch(e => ok(false, '終わったあとに相談を送れない ' + e.message));
   console.log(`\n${pass} 通った / ${fail} だめ`);
   srv.kill(); process.exit(fail ? 1 : 0);
 })().catch(e => { console.error(e); srv.kill(); process.exit(1); });

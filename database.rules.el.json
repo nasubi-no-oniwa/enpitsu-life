@@ -27,6 +27,10 @@
       "r": {
         ".write": "!root.child('el/end').exists() && auth != null && auth.uid === $uid && newData.exists()",
         ".validate": "newData.isNumber() && newData.val() === now && (!data.exists() || now - data.val() >= 10000)"
+      },
+      "a": {
+        ".write": "auth != null && auth.uid === $uid && newData.exists()",
+        ".validate": "newData.isNumber() && newData.val() === now && (!data.exists() || now - data.val() >= 60000)"
       }
     }
   },
@@ -352,6 +356,37 @@
         "$other": {
           ".validate": false
         }
+      }
+    }
+  },
+  "ask": {
+    ".read": "(auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val())",
+    ".indexOn": [
+      "t"
+    ],
+    "$id": {
+      ".write": "(auth != null && !data.exists() && newData.exists() && newData.child('u').val() === auth.uid && newData.child('t').val() === now && newData.parent().parent().child('u/' + auth.uid + '/a').val() === now) || (!newData.exists() && (auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val()))",
+      ".validate": "$id.matches(/^[A-Za-z0-9_-]{8,30}$/) && newData.hasChildren(['t', 'u', 'm', 'x', 'l', 'f'])",
+      "t": {
+        ".validate": true
+      },
+      "u": {
+        ".validate": "newData.isString()"
+      },
+      "m": {
+        ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 300"
+      },
+      "x": {
+        ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9_]{0,15}$/)"
+      },
+      "l": {
+        ".validate": "newData.isString() && newData.val().matches(/^(ja|en|zh|ko)$/)"
+      },
+      "f": {
+        ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 101"
+      },
+      "$other": {
+        ".validate": false
       }
     }
   },

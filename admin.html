@@ -20,6 +20,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 <div id="main" hidden>
  <h2>ようす</h2><div class="box" id="status">…</div><button id="bRe">読みなおす</button>
  <h2>詰みの知らせ</h2><div class="box" id="reps">…</div>
+ <h2>管理人への相談</h2><div class="box" id="asks">…</div>
  <h2>層の管理</h2>
  <div class="box">
   層の番号 <input id="fl" type="number" min="1" max="100" value="1" style="width:90px"><button id="bFl">鉛筆を置いた人を見る</button>
@@ -49,7 +50,7 @@ const log=s=>{$('log').textContent=tm(Date.now())+' '+s+'\n'+$('log').textConten
 async function login(){const k=$('key').value.trim();if(!k)return;try{await N.adminLogin(k);sessionStorage.setItem('el_ak',k);$('login').hidden=true;$('main').hidden=false;load();}catch(e){alert('入れませんでした（かぎがちがうかもしれません）');}}
 $('bLogin').onclick=login;
 const sk=sessionStorage.getItem('el_ak');if(sk){$('key').value=sk;login();}
-async function load(){status();reps();lives();posts();}
+async function load(){status();reps();asks();lives();posts();}
 $('bRe').onclick=load;
 async function status(){
   const [op,st,ck,end]=await Promise.all([N.rest('open').catch(()=>null),N.rest('stat').catch(()=>null),N.rest('ckpt').catch(()=>null),N.rest('end').catch(()=>null)]);
@@ -70,6 +71,17 @@ async function reps(){
   $('reps').innerHTML=h+'</table><button id="bRepDel">見た層の知らせを消す</button>';
   $('reps').querySelectorAll('[data-seen]').forEach(b=>b.onclick=async()=>{await N.repSeen(+b.dataset.seen,+b.dataset.t);reps();});
   $('bRepDel').onclick=async()=>{for(const f in seen)await N.repDel(f).catch(()=>{});reps();};
+}
+async function asks(){
+  let v={};try{v=await N.asks();}catch(e){$('asks').textContent='読めませんでした';return;}
+  const seen=+(localStorage.getItem('el_askseen')||0),L={ja:'日本語',en:'英語',zh:'中国語',ko:'韓国語'};
+  const rows=Object.entries(v||{}).map(([id,r])=>Object.assign({id},r)).filter(r=>r&&r.m).sort((a,b)=>b.t-a.t);
+  if(!rows.length){$('asks').textContent='相談はありません';return;}
+  let h='<table><tr><th>時刻</th><th>最前線</th><th>言葉</th><th>X</th><th>文</th><th></th></tr>';
+  for(const r of rows.slice(0,100))h+=`<tr class="${r.t>seen?'new':''}"><td>${tm(r.t)}</td><td>${r.f|0}</td><td>${L[r.l]||esc(r.l)}</td><td>${r.x?`<a href="https://x.com/${esc(r.x)}" target="_blank" rel="noopener">@${esc(r.x)}</a>`:''}</td><td style="white-space:pre-wrap">${esc(r.m)}</td><td><button class="red" data-ask="${esc(r.id)}">消す</button></td></tr>`;
+  $('asks').innerHTML=h+'</table><button id="bAskSeen">全部見た</button> <span class="small">黄色はまだ見ていない相談。返事は、Xか掲示板のお知らせで。</span>';
+  $('bAskSeen').onclick=()=>{localStorage.setItem('el_askseen',String(rows[0].t));asks();};
+  $('asks').querySelectorAll('[data-ask]').forEach(b=>b.onclick=async()=>{if(!confirm('この相談を消しますか？'))return;await N.askDel(b.dataset.ask);asks();});
 }
 let G=[];
 $('bFl').onclick=async()=>{const f=+$('fl').value;G=await N.dlog(f);let h='<table><tr><th>匿名ID</th><th>置いた数</th><th>はじめ</th><th>さいご</th><th></th></tr>';G.slice(0,60).forEach((g,i)=>{h+=`<tr><td class="small">${esc(g.u.slice(0,10))}…</td><td>${g.n}</td><td>${tm(g.first)}</td><td>${tm(g.last)}</td><td><button class="red" data-i="${i}">取り除く</button></td></tr>`;});$('who').innerHTML=G.length?h+'</table>':'まだだれも置いていません';

@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '2';
+  FT.VER = '3';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -647,6 +647,29 @@
     const m = S.run ? Math.round((S.run.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 1000) : 0;
     try { if (!OFFLINE) await N.report(lv.f, m, a, FT.LANG); $('stText').textContent = msg + ' ' + T('管理人に届けました。ありがとうございます。'); }
     catch (e) { $('stText').textContent = msg + ' ' + T('届けられませんでした（10秒に1回まで）'); $('stGo').disabled = false; }
+  };
+  // ---------- 管理人への相談 ----------
+  function openAsk() {
+    if (OFFLINE) { toast(T('つなぎ先がないので、相談は送れません')); return; }
+    $('askMsg').placeholder = T('相談したいこと（300文字まで）'); $('askX').placeholder = T('XのID（なくてもよい）');
+    if (ME.xid && !$('askX').value) $('askX').value = '@' + ME.xid;
+    $('askDone').hidden = true; $('askSend').disabled = false; ov('oAsk', 1); S.paused = true;
+  }
+  $('bAsk').onclick = () => openAsk();
+  $('askClose').onclick = () => { ov('oAsk', 0); S.paused = false; };
+  $('askSend').onclick = async () => {
+    const m = $('askMsg').value.trim(), xr = $('askX').value.trim(), x = xr ? N.cleanX(xr) : '';
+    if (!m) { toast(T('文を入れてください')); return; }
+    if (m.length > 300) { toast(T('{0}文字までです', 300)); return; }
+    if (xr && !x) { toast(T('XのIDの形ではありません')); return; }
+    const wait = (ME.askT || 0) + 60000 - Date.now(); if (wait > 0) { toast(T('あと{0}秒まってください', Math.ceil(wait / 1000))); return; }
+    $('askSend').disabled = true;
+    try {
+      await N.ask(m, x, FT.LANG, W.latest);
+      ME.askT = Date.now(); if (x) ME.xid = x; saveMe();
+      $('askMsg').value = ''; $('askDone').hidden = false; $('askDone').textContent = T('管理人に届けました。ありがとうございます。');
+    } catch (e) { toast(T('送れませんでした'), T('少したってから、もう一度')); }
+    $('askSend').disabled = false;
   };
   // ---------- 投稿 ----------
   function deadText() { const d = S.deadInfo; if (!d) return ''; return (d.k >= 0 ? T('エンピツライフ 第{0}層で{1}本目の鉛筆になった。名前は「{2}」', d.f, fmt(d.count), d.name) : T('エンピツライフ 第{0}層で「{1}」は砕けた', d.f, d.name)) + '\n' + GAME_URL + '\n' + TAG; }

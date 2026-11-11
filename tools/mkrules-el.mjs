@@ -33,6 +33,21 @@ el.rep = {
     },
   },
 };
+// 管理人への相談：ask/{番号} { t, u, m：文（300文字まで）, x：XのID, l：言葉, f：最前線の層 }。1人1分に1回まで（u の a）。ゲームが終わったあとも送れる
+el.u.$uid.a = { '.write': "auth != null && auth.uid === $uid && newData.exists()", '.validate': "newData.isNumber() && newData.val() === now && (!data.exists() || now - data.val() >= 60000)" };
+el.ask = {
+  '.read': ADMIN, '.indexOn': ['t'],
+  $id: {
+    '.write': `(auth != null && !data.exists() && newData.exists() && newData.child('u').val() === auth.uid && newData.child('t').val() === now && newData.parent().parent().child('u/' + auth.uid + '/a').val() === now) || (!newData.exists() && ${ADMIN})`,
+    '.validate': "$id.matches(/^[A-Za-z0-9_-]{8,30}$/) && newData.hasChildren(['t', 'u', 'm', 'x', 'l', 'f'])",
+    t: { '.validate': true }, u: { '.validate': 'newData.isString()' },
+    m: { '.validate': 'newData.isString() && newData.val().length >= 1 && newData.val().length <= 300' },
+    x: { '.validate': "newData.isString() && newData.val().matches(/^[A-Za-z0-9_]{0,15}$/)" },
+    l: { '.validate': "newData.isString() && newData.val().matches(/^(ja|en|zh|ko)$/)" },
+    f: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 101' },
+    $other: { '.validate': false },
+  },
+};
 // 管理人が見た印（詰みの知らせを読んだ）
 el.repok = { '.read': ADMIN, $f: { '.write': ADMIN, '.validate': 'newData.isNumber()' } };
 const out = JSON.stringify(el, null, 2);
