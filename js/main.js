@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '13';
+  FT.VER = '14';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -46,16 +46,31 @@
   async function verifyChain() {
     if (chainBusy || OFFLINE) return; chainBusy = true;
     try {
-      for (let i = 0; i < 4; i++) {
-        const f = W.latest; if (f > 100 || !W.open[f] || okFloor(f)) break;
+      // いちばん上の「開いた印」から下へ確かめる。上の層を越えた記録が本物なら、その下の層はまとめて開く
+      //  （下から1層ずつ確かめると、まとめが古いとき何分もかかったため）
+      let top = 0; for (const k in W.open) if (+k > top && +k <= 100 && W.open[k]) top = +k;
+      for (let f = top, n = 0; f >= W.latest && f >= 1 && n < 4; f--) {
+        if (!W.open[f] || okFloor(f)) continue;
+        n++;
         const lv = getLevel(f); await N.cellsOnly(lv);
         const c = await N.firstClear(lv);
-        if (!c || c.wait) break;
-        W.okLocal[f] = W.open[f].t; N.store('el_okf', W.okLocal); computeLatest(); paintTitle();
-        if (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear') toast(T('第{0}層が開いた！', W.latest), T('タイトルの「最前線へ」から行けます'), 3500);
+        if (!c || c.wait) continue;
+        const before = W.latest;
+        for (let g = 1; g <= f; g++) if (W.open[g] && !okFloor(g)) W.okLocal[g] = W.open[g].t;
+        N.store('el_okf', W.okLocal); computeLatest(); paintTitle();
+        if (W.latest > before && (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear')) toast(T('第{0}層が開いた！', W.latest), T('タイトルの「最前線へ」から行けます'), 3500);
+        break;
       }
     } catch (e) { } finally { chainBusy = false; }
   }
+  // 最前線が越えられたかを20秒ごとに軽く見る（最前線で遊んでいるとき・タイトルのとき）。新しく越えられていたら、すぐ読みなおして次の層を開く
+  const seenOpen = {};
+  setInterval(() => {
+    if (OFFLINE || document.hidden || chainBusy) return;
+    const f = W.latest; if (!(f >= 1 && f <= 100) || okFloor(f)) return;
+    if (!(S.mode === 'title' || (S.lv && S.lv.f === f && (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear')))) return;
+    N.rest('open/' + f + '/t').then(t => { if (typeof t !== 'number' || seenOpen[f] === t) return; seenOpen[f] = t; refreshWorld().then(() => { if (S.mode === 'title') paintTitle(); }).catch(() => { }); }).catch(() => { });
+  }, 20000);
   // =============================================
   //  画面の切りかえ
   // =============================================
