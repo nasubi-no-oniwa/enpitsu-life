@@ -417,7 +417,7 @@
       const ghost = r && !runCor.has(k) && S.mode === 'play';
       const capN = lv.cap[Math.floor(cxw)] | 0;
       for (let i = 0; i < Math.min(30, c.n); i++) drawPencil(g, X(cxw), Y(sy - i * PH.PH), s, k * 7 + i, 0, ghost ? .35 : 1, ink, false);
-      if (capN > 0 && c.n >= Math.max(1, capN - 1)) { const ly = Y(sy - capN * PH.PH); g.strokeStyle = c.n >= capN ? 'rgba(224,60,50,.95)' : 'rgba(224,60,50,.5)'; g.lineWidth = Math.max(1.5, s * .07); g.setLineDash([s * .18, s * .12]); g.beginPath(); g.moveTo(X(cxw - .35), ly); g.lineTo(X(cxw + .35), ly); g.stroke(); g.setLineDash([]); }
+      if (capN > 0 && c.n >= Math.max(1, capN - 1)) { const ly = Y(sy - capN * PH.PH); g.strokeStyle = c.n >= capN ? 'rgba(224,60,50,.95)' : 'rgba(224,60,50,.5)'; g.lineWidth = Math.max(2, s * .09); g.setLineDash([s * .16, s * .1]); g.beginPath(); g.moveTo(X(cxw - .45), ly); g.lineTo(X(cxw + .45), ly); g.stroke(); g.setLineDash([]); }
     }
     // 予測線
     if (r && !r.p.fly && S.aim && S.mode === 'play') {
