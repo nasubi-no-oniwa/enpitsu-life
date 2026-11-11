@@ -15,17 +15,30 @@
     return true;
   }
   V.snapOk = snapOk;
+  // 再生に使う鉛筆：始まりの鉛筆のうち、確かめ済みの本数まで（赤い線まで・はみ出した山は除く）
+  //  確かめていない鉛筆は再生に入れない（ずるで足した鉛筆は使えない）。それでも同じ場所に刺されば、その記録は本物
+  //  （前は、始まりの鉛筆が1本でも確かめ済みでないと記録ごと通らず、それを足場にしていない記録までつられて通らなかった）
+  V.trustSnap = (lv, snap, present) => {
+    const m = new Map(); let cut = false;
+    for (const [k, c] of snap) {
+      if (!FT.keyOk(lv, k)) { cut = true; continue; }
+      const n = Math.min(c.n, FT.capOf(lv, k), present[k] || 0);
+      if (n < c.n) cut = true;
+      if (n > 0) m.set(k, { n, name: '' });
+    }
+    return { m, cut };
+  };
   // 前の版の決まりが関わる記録か（赤い線より上の鉛筆・はみ出した鉛筆が始まりにある、またははみ出した場所に刺さった）
   //  今の決まりで再生すると合わないことがあるが、ずるではないので「だめ」の数には入れない（その鉛筆は数えない）
   V.oldRec = (lv, snap, p) => { if (!FT.keyOk(lv, +p)) return true; for (const [k, c] of snap) if (c.n > FT.capOf(lv, k) || !FT.keyOk(lv, k)) return true; return false; };
-  // 1つの鉛筆の記録：'ok' / 'snap' / 'replay' / 'long' / 'nodata' / 'cap' / 'old'（前の版の決まりが関わって合わない）
+  // 1つの鉛筆の記録：'ok' / 'snap'（確かめていない鉛筆を足場にしていた） / 'replay' / 'long' / 'nodata' / 'cap' / 'old'（前の版のはみ出し）
   V.verifyDeath = function (lv, it, present) {
     if (!it || typeof it.r !== 'string' || typeof it.c !== 'string' || !(it.k >= 1) || typeof it.p !== 'string') return 'nodata';
     if (it.k > V.DMAX) return 'long';
-    const snap = FT.corParse(it.c);
-    if (!snapOk(snap, present, lv)) return 'snap';
-    const r = FT.replay(lv, snap, it.r, (it.k | 0) + 2);
-    if (!(r.over && !r.clear && r.place && r.place.k >= 0 && String(r.place.k) === it.p)) return V.oldRec(lv, snap, it.p) ? 'old' : 'replay';
+    const snap = FT.corParse(it.c), ts = V.trustSnap(lv, snap, present);
+    const r = FT.replay(lv, ts.m, it.r, (it.k | 0) + 2);
+    // 合わない：確かめていない鉛筆を足場にしていた（'snap'）・前の版のはみ出し（'old'）は、だめの数に入れない
+    if (!(r.over && !r.clear && r.place && r.place.k >= 0 && String(r.place.k) === it.p)) return ts.cut ? 'snap' : (V.oldRec(lv, snap, it.p) ? 'old' : 'replay');
     // 積み重ねる上限（赤い線）をこえていないか
     const tx = Math.floor(FT.colX(FT.kcol(r.place.k)));
     if ((present[it.p] || 0) + 1 > Math.max(1, lv.cap[tx] | 0)) return 'cap';
@@ -50,9 +63,7 @@
   // 越えた記録が本当か
   V.verifyClear = function (lv, c, present) {
     if (!c || typeof c.r !== 'string' || typeof c.c !== 'string' || typeof c.t !== 'number' || !(c.k >= 1)) return false;
-    const snap = FT.corParse(c.c);
-    if (!snapOk(snap, present, lv)) return false;
-    const r = FT.replay(lv, snap, c.r, Math.min(120 * 60 * 10, (c.k | 0) + 2));
+    const r = FT.replay(lv, V.trustSnap(lv, FT.corParse(c.c), present).m, c.r, Math.min(120 * 60 * 10, (c.k | 0) + 2));
     return r.clear;
   };
   // ---------- 1つの層の確かめの状態 ----------

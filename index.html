@@ -116,10 +116,11 @@ if(!IDS.length)return;
 function vis(e){if(!e||!e.isConnected||e.closest('[hidden]'))return false;var r=e.getBoundingClientRect();if(r.width<1||r.height<1)return false;for(var n=e;n&&n.nodeType===1;n=n.parentElement){var s=getComputedStyle(n);if(s.display==='none'||s.visibility==='hidden'||parseFloat(s.opacity)<0.05)return false;}return true;}
 var was={};setInterval(function(){try{var any=false;for(var i=0;i<IDS.length;i++){if(vis(document.getElementById(IDS[i])))any=true;}if(any&&!was.v)ev('result_view');was.v=any;}catch(e){}},700);
 }catch(e){}})();</script>
-<!-- nasubi-ad: スマホのとき、結果画面とタイトル画面の決めた場所に広告の帯（と、決めた場所だけその下に大きい広告）を出す（遊んでいる最中は出さない・ボタンに重ねない・広告の幅320pxを切らない・画面が出たらすぐ見せるが、最初の1.2秒は押しても反応しない・画面が出るたびに読みこみ直す（場所ごとに30秒に1回まで）） -->
+<!-- nasubi-ad: スマホのとき、結果画面とタイトル画面の決めた場所に広告の帯（と、決めた場所だけその下に大きい広告）を出す（遊んでいる最中は出さない・ボタンに重ねない・広告の幅320pxを切らない・画面が出たらすぐ見せるが、最初の1.2秒は押しても反応しない・画面が出るたびに読みこみ直す（場所ごとに30秒に1回まで）・画面が切りかわった瞬間に調べる・広告の会社とのつなぎを先にしておく（広告そのものは先に読みこまない）） -->
 <script>(function(){try{var C=[{"a": "#oDead .card", "v": "#oDead"}, {"a": "#oClear .card", "v": "#oClear"}, {"a": "#title .note", "v": "#title", "t": 1, "b": 1, "m": 20, "x": "", "x2": ""}],BIG=1,M=20,EX="",EX2="",AD='https://nasubi-no-oniwa.github.io/ad/',AD2='https://nasubi-no-oniwa.github.io/ad/big.html',LOCK=1200,MIN=30000;
 if(/[?&]noad=1/.test(location.search))return;
 if(!/iPhone|iPod|Android|Mobile|Windows Phone|BlackBerry/i.test(navigator.userAgent||''))return;
+try{['https://adm.shinobi.jp'].forEach(function(h){var l=document.createElement('link');l.rel='preconnect';l.href=h;document.head.appendChild(l);var d=document.createElement('link');d.rel='dns-prefetch';d.href=h;document.head.appendChild(d);});}catch(_){}
 var S=[];
 function vis(e){if(!e||!e.isConnected||e.closest('[hidden]'))return false;var r=e.getBoundingClientRect();if(r.width<1||r.height<1)return false;for(var n=e;n&&n.nodeType===1;n=n.parentElement){var s=getComputedStyle(n);if(s.display==='none'||s.visibility==='hidden'||parseFloat(s.opacity)<0.05)return false;}return true;}
 function opt(i,k,d){return C[i][k]===undefined?d:C[i][k];}
@@ -146,7 +147,8 @@ if(s.f.parentNode!==s.b){s.b.appendChild(s.f);s.last=now;}if(s.f2&&s.f2.parentNo
 var pe=(now-s.since<LOCK)?'none':'auto';
 s.f.style.visibility='visible';s.f.style.pointerEvents=pe;if(s.f2){s.f2.style.visibility='visible';s.f2.style.pointerEvents=pe;}
 }catch(_){}}
-function go(){place();try{new MutationObserver(place).observe(document.body,{childList:true,subtree:true});}catch(_){}setInterval(tick,300);}
+var qd=0;function q(){if(qd)return;qd=1;var f=function(){qd=0;tick();};try{requestAnimationFrame(f);}catch(_){setTimeout(f,16);}}
+function go(){place();try{new MutationObserver(function(){place();q();}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});}catch(_){}setInterval(tick,300);tick();}
 if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
 }catch(e){}})();</script>
 </head>
@@ -277,13 +279,13 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <button class="btn sub" id="vClose" data-t="とじる">とじる</button>
 </div></div></div>
 
-<script src="js/i18n.js?v=6"></script>
-<script src="js/config.js?v=6"></script>
-<script src="js/engine.js?v=6"></script>
-<script src="js/verify.js?v=6"></script>
-<script src="js/net.js?v=6"></script>
-<script src="js/sound.js?v=6"></script>
-<script src="js/filter.js?v=6"></script>
-<script src="js/main.js?v=6"></script>
+<script src="js/i18n.js?v=7"></script>
+<script src="js/config.js?v=7"></script>
+<script src="js/engine.js?v=7"></script>
+<script src="js/verify.js?v=7"></script>
+<script src="js/net.js?v=7"></script>
+<script src="js/sound.js?v=7"></script>
+<script src="js/filter.js?v=7"></script>
+<script src="js/main.js?v=7"></script>
 </body>
 </html>
