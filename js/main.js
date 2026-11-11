@@ -149,7 +149,7 @@
     }
     W.stat[lv.f] = Object.assign({}, W.stat[lv.f] || {}, { d: count });
     S.deadInfo = { why: pl.why, kind: r.dead, k: pl.k, n: pl.n, count, name: S.name, f: lv.f, rec: S.rec.str(), start: S.start, ticks: r.t, startCor: S.startCor };
-    S.mode = 'dead'; hud();
+    S.mode = 'dead'; hud(); if (S.pvEv) S.pvEv.push(pl.k >= 0 ? 'stick' : 'break');
     SND.se(pl.k >= 0 ? (pl.why === 'stack' ? 'pile' : 'land') : (pl.why === 'sink' ? 'splash' : 'die'));
     setTimeout(showDead, pl.k >= 0 ? 650 : 800);
   }
@@ -169,7 +169,7 @@
   }
   async function onClear() {
     const lv = S.lv, r = S.run;
-    S.mode = 'clear'; SND.se('clear'); fxClear();
+    S.mode = 'clear'; SND.se('clear'); fxClear(); if (S.pvEv) S.pvEv.push('clear');
     ME.how = Math.max(ME.how, 2);
     if (lv.f + 1 > ME.best) ME.best = Math.min(101, lv.f + 1);
     saveMe();
@@ -284,8 +284,8 @@
     const wasFly = r.p.fly;
     r.step(inp);
     for (const e of r.events) {
-      if (e.k === 'go') { SND.se('jump'); fxGo(); }
-      if (e.k === 'land') { SND.se('grab'); fxLand(); hud(); }
+      if (e.k === 'go') { SND.se('jump'); fxGo(); if (S.pvEv) S.pvEv.push('go'); }
+      if (e.k === 'land') { SND.se('grab'); fxLand(); hud(); if (S.pvEv) S.pvEv.push('land'); }
     }
     r.events.length = 0;
     if (wasFly && !r.p.fly && !r.over) S.rec.steer(r.t + 1, 0);
@@ -295,6 +295,7 @@
   S.trail = [];
   function loop(now) {
     requestAnimationFrame(loop);
+    if (S.pv) return;
     const dt = Math.min(0.1, (now - (S.last || now)) / 1000); S.last = now;
     if (S.mode === 'play' && !S.paused && !anyOv()) {
       S.acc += dt;
@@ -707,5 +708,5 @@
   fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; return refreshWorld(); }).then(() => { paintTitle(); loadLive(true); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
   if (!OFFLINE) N.warm();
   // 管理画面などから使う
-  FT.APP = { S, W, getLevel, draw, toast };
+  FT.APP = { S, W, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper };
 })(window);
