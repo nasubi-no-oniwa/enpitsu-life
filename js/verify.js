@@ -9,8 +9,9 @@
   const V = FT.V = {};
   V.DMAX = 120 * 60 * 6;   // 1つの挑戦を再生する長さの上限（6分）
   // 始まりの鉛筆が、確かめた鉛筆の中にあるか（present：{ 場所: 本数 }）
-  function snapOk(snap, present) {
-    for (const [k, c] of snap) { const q = present[k]; if (!q || c.n > q) return false; }
+  //  赤い線より上の分は数えない（同時に積まれて、端末にはそれより多く見えていたことがあるため）
+  function snapOk(snap, present, lv) {
+    for (const [k, c] of snap) { const need = Math.min(c.n, FT.capOf(lv, k)); if (need <= 0) continue; const q = present[k]; if (!q || need > q) return false; }
     return true;
   }
   V.snapOk = snapOk;
@@ -19,7 +20,7 @@
     if (!it || typeof it.r !== 'string' || typeof it.c !== 'string' || !(it.k >= 1) || typeof it.p !== 'string') return 'nodata';
     if (it.k > V.DMAX) return 'long';
     const snap = FT.corParse(it.c);
-    if (!snapOk(snap, present)) return 'snap';
+    if (!snapOk(snap, present, lv)) return 'snap';
     const r = FT.replay(lv, snap, it.r, (it.k | 0) + 2);
     if (!(r.over && !r.clear && r.place && r.place.k >= 0 && String(r.place.k) === it.p)) return 'replay';
     // 積み重ねる上限（赤い線）をこえていないか
@@ -47,7 +48,7 @@
   V.verifyClear = function (lv, c, present) {
     if (!c || typeof c.r !== 'string' || typeof c.c !== 'string' || typeof c.t !== 'number' || !(c.k >= 1)) return false;
     const snap = FT.corParse(c.c);
-    if (!snapOk(snap, present)) return false;
+    if (!snapOk(snap, present, lv)) return false;
     const r = FT.replay(lv, snap, c.r, Math.min(120 * 60 * 10, (c.k | 0) + 2));
     return r.clear;
   };
@@ -82,12 +83,12 @@
   // 新しい記録だけにしぼる（前に確かめた所より後）
   V.newItems = (st, v) => Object.entries(v || {}).map(([id, d]) => Object.assign({ id }, d)).filter(d => d && d.v === 1 && typeof d.t === 'number' && (d.t > st.t || (d.t === st.t && !st.ti.includes(d.id))) && typeof d.p === 'string' && typeof d.u === 'string').sort((a, b) => (a.t - b.t) || (a.id < b.id ? -1 : 1));
   // 見せる鉛筆：確かめた鉛筆 ＋ まだ確かめていない鉛筆（だめな記録の多いIDの分は見せない）
-  V.shown = (st, raw, rest) => {
+  V.shown = (st, raw, rest, lv) => {
     const out = new Map();
     const pend = {};
     for (const d of rest || []) if ((st.bad[d.u] || 0) < 3) pend[d.p] = (pend[d.p] || 0) + 1;
     const keys = new Set([...Object.keys(st.P), ...Object.keys(pend)]);
-    for (const k of keys) { const c = raw[k]; if (!c) continue; const n = Math.min(30, c.n | 0 || 1, (st.P[k] || 0) + (pend[k] || 0)); if (n > 0) out.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); }
+    for (const k of keys) { const c = raw[k]; if (!c) continue; const n = Math.min(30, c.n | 0 || 1, (st.P[k] || 0) + (pend[k] || 0), FT.capOf(lv, +k)); if (n > 0) out.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); }
     return out;
   };
 })(typeof window !== 'undefined' ? window : globalThis);

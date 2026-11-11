@@ -44,6 +44,8 @@
   FT.kcol = k => k % KC; FT.ksy = k => Math.floor(k / KC);
   FT.colX = col => col * CW + CW / 2;   // 列のまん中
   FT.colOf = x => Math.floor(x / CW);
+  // その場所の列に積める本数（赤い線）
+  FT.capOf = (lv, k) => (lv && lv.cap) ? (lv.cap[Math.floor((k % KC) * CW + CW / 2)] | 0) : 30;
   // ---------- 角度と強さ（操作の記録に入る形） ----------
   //  a：角度の番号 0〜240（0.5度きざみ、120がまっすぐ上）  p：強さ 0〜1000
   FT.aIdx = deg => Math.max(0, Math.min(240, Math.round((deg + AMAX) * 2)));
@@ -68,7 +70,8 @@
       this.cor = cor;
       // 列ごとの鉛筆の山（ぶつかりの計算を軽くする）
       this.cols = new Map();
-      for (const [k, c] of cor) { const col = FT.kcol(k), sy = FT.ksy(k), n = Math.min(c.n | 0, 30); if (n <= 0) continue; let a = this.cols.get(col); if (!a) this.cols.set(col, a = []); a.push({ k, sy, n, top: sy - n * PH }); }
+      // 赤い線（その列に積める本数）より上の鉛筆は、ないものとして計算する（同時に積まれて数がこえても、見え方と動きを決まりどおりにする）
+      for (const [k, c] of cor) { const col = FT.kcol(k), sy = FT.ksy(k), n = Math.min(c.n | 0, 30, FT.capOf(lv, k)); if (n <= 0) continue; let a = this.cols.get(col); if (!a) this.cols.set(col, a = []); a.push({ k, sy, n, top: sy - n * PH }); }
       this.t = 0; this.over = false; this.clear = false; this.dead = null; this.place = null;
       // 立っている（stand：立っている山。null はスタートの台）
       const st = lv.start;

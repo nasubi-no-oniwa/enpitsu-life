@@ -132,8 +132,8 @@
   // =============================================
   //  鉛筆を読む（まとめ＋新しい分。確かめた鉛筆と、確かめ中の鉛筆）
   // =============================================
-  const DV = () => store('el_dv') || {};
-  function dvSave(f, st) { const o = DV(); o[f] = st; for (const k of Object.keys(o)) if (Math.abs(+k - f) > 3) delete o[k]; store('el_dv', o); }
+  const DV = () => store('el_dv2') || {};
+  function dvSave(f, st) { const o = DV(); o[f] = st; for (const k of Object.keys(o)) if (Math.abs(+k - f) > 3) delete o[k]; store('el_dv2', o); }
   let worker = null, wid = 0; const wcb = {};
   function getWorker() {
     if (worker !== null) return worker;
@@ -156,10 +156,12 @@
     const [rm, rs] = N.ready() && !N.frozen ? await Promise.all([rest('rm/' + f + '/t').catch(() => null), rest('reset/' + f + '/t').catch(() => null)]) : [null, null];
     F.rmKey = (rm || 0) + '_' + (rs || 0); F.rmT = Math.max(rm || 0, rs || 0); F.rmAt = Date.now();
     const idx = await N.snapIndex(), sn = await snapFloor(f, idx);
+    // まとめの確かめ方の版（sv）がちがう手元の記録は使わない（古い確かめ方の結果を引きずらない）
+    F.sv = (sn && sn.ver) | 0;
     const c = DV()[f];
     if (sn && sn.at > F.rmT) { F.raw = sn.raw || {}; F.maxT = Math.max(0, (sn.at || 0) - 120000); F.st = sn.st || V.newState(); }
     else F.st = V.newState();
-    if (c && c.key === F.rmKey && c.st && c.st.t >= F.st.t) F.st = c.st;
+    if (c && c.key === F.rmKey && (c.sv | 0) === F.sv && c.st && c.st.t >= F.st.t) F.st = c.st;
     if (N.ready() && !N.frozen) {
       const v = F.maxT ? await rest('cells/' + f, { orderBy: 't', startAt: F.maxT }) : await rest('cells/' + f);
       for (const k in v || {}) if (v[k]) F.raw[k] = v[k];
@@ -170,7 +172,7 @@
   }
   async function trust(lv, ms) {
     const F = await floorState(lv), f = lv.f;
-    if (!N.ready() || N.frozen) return V.shown(F.st, F.raw, []);
+    if (!N.ready() || N.frozen) return V.shown(F.st, F.raw, [], lv);
     if (Date.now() - F.rmAt > 300000) {
       F.rmAt = Date.now();
       const [rm, rs] = await Promise.all([rest('rm/' + f + '/t').catch(() => null), rest('reset/' + f + '/t').catch(() => null)]);
@@ -181,10 +183,10 @@
     }
     let items = null;
     try { items = V.newItems(F.st, await rest('dlog/' + f, { orderBy: 't', startAt: F.st.t })); } catch (e) { items = null; }
-    if (!items) { F.more = true; return V.shown(F.st, F.raw, F.rest); }
-    const res = await V.advance(lv, F.st, F.raw, items, id => rest('drec/' + f + '/' + id), { ms, run: runDeaths, save: st => dvSave(f, { key: F.rmKey, st }) });
+    if (!items) { F.more = true; return V.shown(F.st, F.raw, F.rest, lv); }
+    const res = await V.advance(lv, F.st, F.raw, items, id => rest('drec/' + f + '/' + id), { ms, run: runDeaths, save: st => dvSave(f, { key: F.rmKey, st, sv: F.sv }) });
     F.rest = res.rest; F.more = res.more;
-    return V.shown(F.st, F.raw, F.rest);
+    return V.shown(F.st, F.raw, F.rest, lv);
   }
   N.trust = (lv, ms) => { const p = (lv._tp || Promise.resolve()).catch(() => { }).then(() => trust(lv, ms)); lv._tp = p; return p; };
   N.loadCells = lv => N.trust(lv, 8000);
@@ -194,9 +196,9 @@
     if (N.ready() && !N.frozen) {
       try { const v = await rest('cells/' + lv.f, { orderBy: 't', startAt: F.maxT + 1 }); for (const k in v || {}) { if (!v[k]) continue; F.raw[k] = v[k]; if (v[k].t > F.maxT) F.maxT = v[k].t; } } catch (e) { }
     }
-    const m = V.shown(F.st, F.raw, F.rest);
-    for (const k in F.raw) { const c = F.raw[k]; if (c && c.t > (F.st.t || 0) - 1) { const n = Math.min(30, c.n | 0 || 1); const cur = m.get(+k); if (!cur || cur.n < n) m.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); } }
-    for (const [k, c] of mine || []) { const cur = m.get(k); if (!cur || cur.n < c.n) m.set(k, c); }
+    const m = V.shown(F.st, F.raw, F.rest, lv);
+    for (const k in F.raw) { const c = F.raw[k]; if (c && c.t > (F.st.t || 0) - 1) { const n = Math.min(30, c.n | 0 || 1, FT.capOf(lv, +k)); if (n <= 0) continue; const cur = m.get(+k); if (!cur || cur.n < n) m.set(+k, { n, name: String(c.l || '名無し').slice(0, 12), t: c.t || 0 }); } }
+    for (const [k, c] of mine || []) { const n = Math.min(c.n | 0, FT.capOf(lv, k)); if (n <= 0) continue; const cur = m.get(k); if (!cur || cur.n < n) m.set(k, Object.assign({}, c, { n })); }
     return m;
   };
   N.present = lv => lv._F ? V.presentOf(lv._F.st, lv._F.raw) : {};
@@ -237,6 +239,8 @@
           err = e; if (!perm(e)) break;
           // 断られた：新しい山のつもりが、もうほかの人が刺していた → 積み重ねとして送りなおす
           await Promise.all(batch.filter(e2 => e2.k >= 0 && w['cells/' + e2.f + '/' + e2.k]).map(async e2 => { const cp = 'cells/' + e2.f + '/' + e2.k, v = w[cp]; const ex = await rest(cp + '/n').catch(() => null); if (typeof ex === 'number') { delete w[cp]; w[cp + '/n'] = INC(); w[cp + '/t'] = SV; w[cp + '/g'] = v.g; } }));
+          // もう赤い線（またはデータベースの上限30本）まで積まれている山：この鉛筆は残らないので送らない（ほかの記録までまとめて断られないように）
+          await Promise.all(batch.filter(e2 => e2.k >= 0 && !e2.drop).map(async e2 => { const cp = 'cells/' + e2.f + '/' + e2.k; const ex = await rest(cp + '/n').catch(() => null); if (typeof ex === 'number' && ex + 1 > Math.min(30, e2.cap || 30)) { e2.drop = true; for (const kk of Object.keys(w)) if (kk === cp || kk.startsWith(cp + '/')) delete w[kk]; const g = Object.keys(w).find(kk => kk.startsWith('dlog/' + e2.f + '/') && w[kk] && w[kk].p === String(e2.k)); if (g) { const id = g.split('/')[2]; delete w['dlog/' + e2.f + '/' + id]; delete w['drec/' + e2.f + '/' + id]; } } }));
           // 積み重ねのつもりが、その山がもうない（管理人が取り除いた）→ 新しい山として送る
           await Promise.all(batch.filter(e2 => e2.k >= 0 && w['cells/' + e2.f + '/' + e2.k + '/n']).map(async e2 => { const cp = 'cells/' + e2.f + '/' + e2.k; const ex = await rest(cp + '/n').catch(() => 1); if (ex === null) { const g = w[cp + '/g']; delete w[cp + '/n']; delete w[cp + '/t']; delete w[cp + '/g']; w[cp] = { n: INC(), s: 0, l: N.cleanName(e2.name) || '名無し', t: SV, g }; } }));
           for (const f in per) delete w['stat/' + f + '/m'];
@@ -245,7 +249,7 @@
         }
       }
       lastC = Date.now();
-      for (const e of batch) { Q.splice(Q.indexOf(e), 1); if (ok) e.res(true); else e.rej(err || new Error('send')); }
+      for (const e of batch) { Q.splice(Q.indexOf(e), 1); if (ok) e.res(!e.drop); else e.rej(err || new Error('send')); }
       if (ok) for (const f in per) N.mKnown[f] = Math.max(N.mKnown[f] || 0, per[f].m);
     } catch (e) {
       for (const x of Q.splice(0, Math.min(Q.length, 6))) x.rej(e);
@@ -299,12 +303,12 @@
     const r = await Promise.allSettled(jobs); if (r[0].status !== 'fulfilled') throw r[0].reason;
   };
   // その層を本当に越えた一番早い記録
-  const VC = () => store('el_vc') || {};
+  const VC = () => store('el_vc2') || {};
   N.firstClear = async function (lv) {
     const f = lv.f;
     if (N.more(lv)) return { wait: true };
     const F = lv._F, rs = F ? F.rmKey : '';
-    const vc = VC(); let cur = vc[f] && vc[f].rs === rs ? vc[f].t : 0;
+    const sv = (F && F.sv) | 0, vc = VC(); let cur = vc[f] && vc[f].rs === rs && (vc[f].sv | 0) === sv ? vc[f].t : 0;
     let budget = 120 * 60 * 120;
     const present = N.present(lv);
     for (let page = 0; page < 30; page++) {
@@ -315,7 +319,7 @@
         if (budget <= 0) return { wait: true };
         budget -= Math.min(120 * 60 * 10, Math.max(1, c.k | 0));
         if (await N.verifyClearAsync(lv, c, present)) return c;
-        cur = c.t; const o = VC(); o[f] = { t: cur, rs }; store('el_vc', o);
+        cur = c.t; const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc2', o);
       }
       if (list.length < 10) return null;
     }

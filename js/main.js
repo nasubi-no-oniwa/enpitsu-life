@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '4';
+  FT.VER = '5';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -144,7 +144,7 @@
       const c = { n: pl.n, name: S.name, t: Date.now() };
       S.cor.set(pl.k, c); S.mine.set(pl.k, c);
       if (OFFLINE) saveLocalCor(lv.f, S.cor);
-      else N.died({ f: lv.f, k: pl.k, n: pl.n, name: S.name, rec: S.rec.str(), cor: S.start, ticks: r.t, m }).catch(() => { });
+      else N.died({ f: lv.f, k: pl.k, n: pl.n, cap: FT.capOf(lv, pl.k), name: S.name, rec: S.rec.str(), cor: S.start, ticks: r.t, m }).catch(() => { });
       fxStick(pl);
     } else {
       if (!OFFLINE) N.statOnly(lv.f, m).catch(() => { });
@@ -424,7 +424,7 @@
       if (cxw < ox - 2 || cxw > ox + W2 / s + 2) continue;
       const ghost = r && !runCor.has(k) && S.mode === 'play';
       const capN = lv.cap[Math.floor(cxw)] | 0;
-      for (let i = 0; i < Math.min(30, c.n); i++) drawPencil(g, X(cxw), Y(sy - i * PH.PH), s, k * 7 + i, 0, ghost ? .35 : 1, ink, false);
+      for (let i = 0, nn = Math.min(30, c.n, FT.capOf(lv, k)); i < nn; i++) drawPencil(g, X(cxw), Y(sy - i * PH.PH), s, k * 7 + i, 0, ghost ? .35 : 1, ink, false);
       if (capN > 0 && c.n >= Math.max(1, capN - 1)) { const ly = Y(sy - capN * PH.PH); g.strokeStyle = c.n >= capN ? 'rgba(224,60,50,.95)' : 'rgba(224,60,50,.5)'; g.lineWidth = Math.max(2, s * .09); g.setLineDash([s * .16, s * .1]); g.beginPath(); g.moveTo(X(cxw - .45), ly); g.lineTo(X(cxw + .45), ly); g.stroke(); g.setLineDash([]); }
     }
     // 予測線
@@ -538,7 +538,14 @@
   //  画面のボタン
   // =============================================
   function retry() { ov('oDead', 0); S.trail = []; if (S.lv) newLife(); }
+  let verNew = false, verAt = 0;
+  async function checkVer() {
+    if (Date.now() - verAt < 180000) return; verAt = Date.now();
+    try { const r = await fetch('data/ver.json?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; const v = await r.json(); if (v && +v.v > +FT.VER && !verNew) { verNew = true; if (S.mode === 'title') location.reload(); else toast(T('新しい版があります'), T('タイトルに戻ると読みこみ直します'), 4000); } } catch (e) { }
+  }
+  setInterval(checkVer, 60000);
   function toTitle() {
+    if (verNew) { N.flush().catch(() => { }).finally(() => location.reload()); return; }
     for (const o of document.querySelectorAll('.ov')) o.classList.remove('on');
     S.mode = 'title'; S.lv = null; S.run = null; scr('title'); document.body.classList.remove('dark'); hint(''); N.flush().catch(() => { });
     SND.bgm(null); refreshWorld().then(paintTitle); loadLive();

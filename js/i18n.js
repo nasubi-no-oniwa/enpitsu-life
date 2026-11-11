@@ -175,6 +175,8 @@
     '一番乗りは、まだいない': ['No first clear yet', '還沒有人第一個越過', '최초 돌파는 아직 없다'],
     '卒業生': ['Graduates', '畢業生', '졸업생'],
     '第100層を越えた人': ['Cleared Floor 100', '越過第100層的人', '100층을 넘은 사람'],
+    '新しい版があります': ['A new version is available', '有新版本', '새 버전이 있어요'],
+    'タイトルに戻ると読みこみ直します': ['It will reload when you return to the title', '回到標題時會重新讀取', '타이틀로 돌아가면 다시 불러와요'],
     'ノートのすみっこ': ['Notebook Corner', '筆記本的角落', '공책 구석'],
     '方眼紙の原っぱ': ['Graph Paper Fields', '方格紙原野', '모눈종이 들판'],
     '黒板のがけ': ['Blackboard Cliffs', '黑板懸崖', '칠판 절벽'],

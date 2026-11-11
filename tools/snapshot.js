@@ -16,6 +16,8 @@ else { const ctx = { window: {} }; vm.createContext(ctx); vm.runInContext(fs.rea
 const OUT = process.env.EL_SNAP_DIR || path.join(ROOT, 'data', 'snap');
 const floors = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/levels.json'))).map(FT.makeLevel);
 const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
+// 確かめ方の版（変えたら、前のまとめの確かめをやりなおす）。2：赤い線より上の分は数えない
+const SVER = 2;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);
@@ -32,21 +34,21 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
   const [open, stat, ckpt, rm, rs, end] = await Promise.all([rest('open'), rest('stat'), rest('ckpt').catch(() => null), rest('rm').catch(() => null), rest('reset').catch(() => null), rest('end').catch(() => null)]);
   const OPEN = obj(open), STAT = obj(stat), RM = obj(rm), RS = obj(rs);
   let mTop = 0; for (const k in OPEN) if (+k > mTop && +k <= 100) mTop = +k;
-  const idx = { at, top: Math.min(101, mTop + 1), end: end && typeof end === 'object' ? end : null, ckpt: typeof ckpt === 'number' ? ckpt : null, open: {}, stat: STAT, ok: {}, floors: Object.assign({}, prevIdx.floors || {}), vc: Object.assign({}, prevIdx.vc || {}) };
+  const idx = { at, top: Math.min(101, mTop + 1), end: end && typeof end === 'object' ? end : null, ckpt: typeof ckpt === 'number' ? ckpt : null, open: {}, stat: STAT, ok: {}, floors: Object.assign({}, prevIdx.floors || {}), vc: prevIdx.ver === SVER ? Object.assign({}, prevIdx.vc || {}) : {}, ver: SVER };
   for (const f in OPEN) idx.open[f] = { t: OPEN[f].t, n: String(OPEN[f].n || '').slice(0, 12), w: String(OPEN[f].w || '').slice(0, 12), x: String(OPEN[f].x || '').slice(0, 15), id: OPEN[f].id };
   const top = Math.min(100, idx.top), states = {};
   for (let f = 1; f <= top; f++) {
     const file = path.join(OUT, 'f' + f + '.json'), prev = readJ(file, null);
     const rmKey = ((RM[f] && RM[f].t) || 0) + '_' + ((RS[f] && RS[f].t) || 0);
     let raw = {}, st = V.newState(), since = 0;
-    if (prev && prev.rmKey === rmKey) { raw = prev.raw || {}; st = prev.st || st; since = Math.max(0, (prev.at || 0) - 120000); }
-    const active = !prev || prev.rmKey !== rmKey || ((STAT[f] && STAT[f].d) || 0) !== (prev.d || 0) || f === top;
+    if (prev && prev.rmKey === rmKey && prev.ver === SVER) { raw = prev.raw || {}; st = prev.st || st; since = Math.max(0, (prev.at || 0) - 120000); }
+    const active = !prev || prev.rmKey !== rmKey || prev.ver !== SVER || ((STAT[f] && STAT[f].d) || 0) !== (prev.d || 0) || f === top;
     if (active && Date.now() - T0 < LIMIT) {
       const v = since ? await rest('cells/' + f, { orderBy: 't', startAt: since }) : await rest('cells/' + f);
       for (const k in v || {}) if (v[k]) raw[k] = { n: v[k].n, l: v[k].l, t: v[k].t };
       const items = V.newItems(st, await rest('dlog/' + f, { orderBy: 't', startAt: st.t }));
       await V.advance(floors[f - 1], st, raw, items, id => rest('drec/' + f + '/' + id), { ms: Math.max(1000, LIMIT - (Date.now() - T0)) });
-      const out = { at, f, rmKey, d: (STAT[f] && STAT[f].d) || 0, raw, st: { t: st.t, ti: st.ti, P: st.P, bad: st.bad } };
+      const out = { at, ver: SVER, f, rmKey, d: (STAT[f] && STAT[f].d) || 0, raw, st: { t: st.t, ti: st.ti, P: st.P, bad: st.bad } };
       fs.writeFileSync(file, JSON.stringify(out)); idx.floors[f] = at;
       states[f] = { st, raw };
     } else if (prev) states[f] = { st: prev.st, raw: prev.raw };
@@ -79,7 +81,7 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
   let L = 1; while (L <= 100 && idx.ok[L]) L++; idx.vtop = Math.min(101, L);
   fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(idx));
   // 卒業生：第100層を越えた記録を、古い順に再生して確かめ、本物だけ並べる（ノートの最後のページ）
-  const gfile = path.join(OUT, 'grads.json'), G = readJ(gfile, { cur: 0, list: [] });
+  const gfile = path.join(OUT, 'grads.json'), G0 = readJ(gfile, { cur: 0, list: [] }), G = G0.ver === SVER ? G0 : { cur: 0, list: [], ver: SVER };
   if (states[100] && idx.ok[100]) {
     const present = V.presentOf(states[100].st, states[100].raw);
     for (let page = 0; page < 30 && Date.now() - T0 < LIMIT; page++) {
