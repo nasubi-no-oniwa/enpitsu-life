@@ -17,7 +17,8 @@ const OUT = process.env.EL_SNAP_DIR || path.join(ROOT, 'data', 'snap');
 const floors = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/levels.json'))).map(FT.makeLevel);
 const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
 // 確かめ方の版（変えたら、前のまとめの確かめをやりなおす）。2：赤い線より上の分は数えない　3：はみ出した鉛筆は数えない　4：確かめ済みの鉛筆だけで再生して合えば通す（つられて通らないのをなくす）
-const SVER = 4;
+// 5：越えた記録は、データベースにある鉛筆でも再生する・ちがう人が3人以上越えていれば越えられたとみなす（管理人が確かめなくても先へ）
+const SVER = 5;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);
@@ -71,9 +72,10 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
       const v = await rest('clear/' + f, { orderBy: 't', startAt: cur + 1, limitToFirst: 10 });
       const list = Object.entries(v || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => typeof c.t === 'number' && c.t > cur).sort((a, b) => a.t - b.t);
       if (!list.length) break;
-      for (const c of list) { if (V.verifyClear(floors[f - 1], c, present)) { found = c; break; } cur = c.t; }
+      for (const c of list) { if (V.verifyClear(floors[f - 1], c, present, S.raw)) { found = c; break; } cur = c.t; }
       if (list.length < 10) break;
     }
+    if (!found) { const all = await rest('clear/' + f, { orderBy: 't', limitToFirst: 60 }).catch(() => null); const L = Object.entries(all || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => typeof c.t === 'number').sort((a, b) => a.t - b.t); if (V.manyClears(L)) found = L.find(c => c.id === o.id) || L[0]; }
     idx.vc[f] = { t: cur, k: o.t };
     if (!found) break;
     idx.ok[f] = { t: o.t, ct: found.t, id: found.id, n: String(found.n || '名無し').slice(0, 12), w: found.id === o.id ? o.w : String(found.w || '').slice(0, 12), x: found.id === o.id ? o.x : String(found.x || '').slice(0, 15) };

@@ -5,7 +5,7 @@ onmessage = function (ev) {
   const d = ev.data, FT = self.FT;
   try {
     if (d.type === 'deaths') postMessage({ id: d.id, res: FT.V.verifyDeaths(d.lv, d.items, d.present, d.bad, d.budget) });
-    else if (d.type === 'clear') postMessage({ id: d.id, res: !!FT.V.verifyClear(d.lv, d.c, d.present) });
+    else if (d.type === 'clear') postMessage({ id: d.id, res: !!FT.V.verifyClear(d.lv, d.c, d.present, d.raw) });
     else if (d.type === 'stuck') { importScripts('stuck.js?v=' + V); postMessage({ id: d.id, res: FT.stuckCheck(d.lv, d.cor, d.opt) }); }
   } catch (e) { postMessage({ id: d.id, err: String(e) }); }
 };

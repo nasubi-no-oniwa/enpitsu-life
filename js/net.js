@@ -148,7 +148,7 @@
   const plainLv = lv => ({ f: lv.f, w: lv.w, h: lv.h, tiles: lv.tiles, cap: lv.cap, start: lv.start, goal: lv.goal, ents: lv.ents });
   N.plainLv = plainLv;
   const runDeaths = (lv, items, present, bad, budget) => inWorker('deaths', { lv: plainLv(lv), items: items.map(d => ({ id: d.id, p: d.p, u: d.u, t: d.t, r: d.r, c: d.c, k: d.k })), present, bad, budget }, () => V.verifyDeaths(lv, items, present, bad, budget));
-  N.verifyClearAsync = (lv, c, present) => inWorker('clear', { lv: plainLv(lv), c: { t: c.t, r: c.r, c: c.c, k: c.k }, present }, () => V.verifyClear(lv, c, present));
+  N.verifyClearAsync = (lv, c, present, raw) => inWorker('clear', { lv: plainLv(lv), c: { t: c.t, r: c.r, c: c.c, k: c.k }, present, raw: raw ? V.dbOf(raw) : null }, () => V.verifyClear(lv, c, present, raw));
   async function floorState(lv) {
     const f = lv.f;
     if (lv._F) return lv._F;
@@ -330,16 +330,18 @@
     for (let page = 0; page < 30; page++) {
       const v = await rest('clear/' + f, { orderBy: 't', startAt: cur + 1, limitToFirst: 10 });
       const list = Object.entries(v || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => typeof c.t === 'number' && c.t > cur).sort((a, b) => a.t - b.t);
-      if (!list.length) return null;
+      if (!list.length) break;
       for (const c of list) {
         if (budget <= 0) return { wait: true };
         budget -= Math.min(120 * 60 * 10, Math.max(1, c.k | 0));
-        if (await N.verifyClearAsync(lv, c, present)) return c;
+        if (await N.verifyClearAsync(lv, c, present, F && F.raw)) return c;
         cur = c.t; const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc3', o);
       }
-      if (list.length < 10) return null;
+      if (list.length < 10) break;
     }
-    return { wait: true };
+    // どれも再生で合わなくても、ちがう人が3人以上越えていれば越えられたとみなす
+    try { const all = await rest('clear/' + f, { orderBy: 't', limitToFirst: 60 }); const L = Object.values(all || {}); if (V.manyClears(L)) return L.sort((a, b) => a.t - b.t)[0]; } catch (e) { }
+    return null;
   };
   // 卒業の碑（第100層を越えた人）
   // =============================================

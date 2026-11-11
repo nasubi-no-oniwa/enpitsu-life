@@ -60,12 +60,19 @@
     }
     return { done: i, add, badInc };
   };
-  // 越えた記録が本当か
-  V.verifyClear = function (lv, c, present) {
+  // データベースにある鉛筆の数（{ 場所: 本数 }・30本まで）
+  V.dbOf = raw => { const o = {}; for (const k in raw || {}) { const c = raw[k]; if (c) o[k] = Math.min(30, c.n | 0 || 1); } return o; };
+  // 越えた記録が本当か：まず確かめ済みの鉛筆だけで再生し、届かなければ、データベースにある鉛筆（その人に見えていた本数まで・赤い線まで）で再生する
+  //  （確かめ済みの鉛筆だけにすると、ほかの人の記録のずれにつられて、正しく越えた記録まで通らず、次の層が開かないことがあった）
+  V.verifyClear = function (lv, c, present, raw) {
     if (!c || typeof c.r !== 'string' || typeof c.c !== 'string' || typeof c.t !== 'number' || !(c.k >= 1)) return false;
-    const r = FT.replay(lv, V.trustSnap(lv, FT.corParse(c.c), present).m, c.r, Math.min(120 * 60 * 10, (c.k | 0) + 2));
-    return r.clear;
+    const snap = FT.corParse(c.c), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
+    if (FT.replay(lv, V.trustSnap(lv, snap, present).m, c.r, lim).clear) return true;
+    return !!raw && FT.replay(lv, V.trustSnap(lv, snap, V.dbOf(raw)).m, c.r, lim).clear;
   };
+  // 越えた記録がどれも再生で合わなくても、ちがう人が3人以上越えていれば、その層は越えられたとみなす（管理人が確かめなくても先へ進めるように）
+  V.CLEAR_PEOPLE = 3;
+  V.manyClears = list => new Set((list || []).filter(c => c && typeof c.u === 'string' && typeof c.t === 'number').map(c => c.u)).size >= V.CLEAR_PEOPLE;
   // ---------- 1つの層の確かめの状態 ----------
   //  st：{ t：どこまで確かめたか, ti：その時刻で終えた記録, P：{場所: 確かめた本数}, bad：{匿名ID: だめな数} }
   V.newState = () => ({ t: 0, ti: [], P: {}, bad: {} });
