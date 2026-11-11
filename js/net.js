@@ -330,10 +330,22 @@
   //  詰みの知らせ（自動で走らせた判定つき）
   // =============================================
   let lastR = 0;
-  N.report = async function (f, m, a, l) {
+  // e：観戦モード用（なくてもよい）{ c：見えていた鉛筆, x・y：立っていた所 }
+  N.report = async function (f, m, a, l, e) {
     if (Date.now() - lastR < 10500) throw new Error('wait');
     await N.token(); const uid = N.uid();
-    await update({ ['u/' + uid + '/r']: SV, ['rep/' + f + '/' + pid()]: { t: SV, u: uid, m: Math.max(0, Math.min(1000, m | 0)), a: String(a || '').slice(0, 300), l: l || 'ja' } });
+    const o = { t: SV, u: uid, m: Math.max(0, Math.min(1000, m | 0)), a: String(a || '').slice(0, 300), l: l || 'ja' };
+    if (e) {
+      if (typeof e.c === 'string' && e.c) o.c = e.c.slice(0, 30000);
+      if (Number.isFinite(e.x) && Number.isFinite(e.y)) { o.x = Math.round(Math.max(-10, Math.min(5000, e.x)) * 100) / 100; o.y = Math.round(Math.max(-50, Math.min(500, e.y)) * 100) / 100; }
+    }
+    try { await update({ ['u/' + uid + '/r']: SV, ['rep/' + f + '/' + pid()]: o }); }
+    catch (err) {
+      // データベースの決まりがまだ古いとき：観戦用の中身を外して送りなおす
+      if (!perm(err) || (o.c === undefined && o.x === undefined)) throw err;
+      delete o.c; delete o.x; delete o.y;
+      await update({ ['u/' + uid + '/r']: SV, ['rep/' + f + '/' + pid()]: o });
+    }
     lastR = Date.now();
   };
   N.reports = async function () { const v = await restMe('rep'); return v || {}; };

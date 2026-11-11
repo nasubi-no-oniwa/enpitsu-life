@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '8';
+  FT.VER = '9';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -145,7 +145,7 @@
   let frontAt = 0;
   function paintFront() {
     const lv = S.lv; if (!lv) return; frontAt = Date.now();
-    const me = progOf(S.run, lv), front = Math.max(frontOf(lv.f), me);
+    const me = S.mode === 'spec' && SP.d ? Math.max(0, Math.min(1000, SP.d.m | 0)) : progOf(S.run, lv), front = Math.max(frontOf(lv.f), me);
     setBar('hFr', front, me, Math.floor(front / 10) + '%');
   }
   const countPencils = () => { let n = 0; for (const c of S.cor.values()) n += c.n | 0; return n; };
@@ -259,6 +259,7 @@
   };
   cv.addEventListener('pointerdown', e => {
     SND.unlock();
+    if (S.mode === 'spec' && !anyOv()) { cv.setPointerCapture && cv.setPointerCapture(e.pointerId); SP.pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); specPinch(); return; }
     if (S.mode !== 'play' || anyOv() || S.loading) return;
     cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
     ptr.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
@@ -266,10 +267,18 @@
     updSteer();
   });
   cv.addEventListener('pointermove', e => {
+    if (S.mode === 'spec') {
+      const q = SP.pts.get(e.pointerId); if (!q) return; const sc = VW / S.cam.z;
+      if (SP.pts.size === 1) { S.cam.x -= (e.clientX - q.x) / sc; S.cam.y -= (e.clientY - q.y) / sc; }
+      q.x = e.clientX; q.y = e.clientY;
+      if (SP.pts.size === 2 && SP.pinch) { const [a, b] = [...SP.pts.values()]; S.cam.z = SP.pinch.z * SP.pinch.d / Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)); }
+      specCam(); return;
+    }
     const q = ptr.get(e.pointerId); if (!q) return; q.x = e.clientX; q.y = e.clientY;
     if (e.pointerId === aimId && S.run && !S.run.p.fly) { S.aim = aimFrom(q.sx, q.sy, q.x, q.y); if (S.aim) hint(''); }
   });
   const up = e => {
+    if (SP.pts.has(e.pointerId)) { SP.pts.delete(e.pointerId); specPinch(); return; }
     const q = ptr.get(e.pointerId); ptr.delete(e.pointerId);
     if (e.pointerId === aimId) {
       aimId = null;
@@ -279,6 +288,8 @@
     updSteer();
   };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  function specPinch() { if (SP.pts.size === 2) { const [a, b] = [...SP.pts.values()]; SP.pinch = { d: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)), z: S.cam.z }; } else SP.pinch = null; }
+  cv.addEventListener('wheel', e => { if (S.mode !== 'spec') return; e.preventDefault(); S.cam.z *= e.deltaY > 0 ? 1.12 : 1 / 1.12; specCam(); }, { passive: false });
   function updSteer() {
     let L = 0, R = 0;
     if (S.run && S.run.p.fly) for (const [id, q] of ptr) { if (id === aimId) continue; if (q.x < VW / 2) L = 1; else R = 1; }
@@ -289,6 +300,7 @@
   window.addEventListener('keydown', e => {
     if (e.target && e.target.tagName === 'INPUT') return;
     if (S.mode === 'dead' && (e.key === ' ' || e.key === 'Enter') && $('oDead').classList.contains('on')) { e.preventDefault(); retry(); return; }
+    if (S.mode === 'spec' && !anyOv()) { const k = e.key; if (k === 'ArrowLeft' || k === 'a') S.cam.x -= 1.5; if (k === 'ArrowRight' || k === 'd') S.cam.x += 1.5; if (k === 'ArrowUp' || k === 'w') S.cam.y -= 1.5; if (k === 'ArrowDown' || k === 's') S.cam.y += 1.5; if (k === '+' || k === '=') S.cam.z /= 1.15; if (k === '-') S.cam.z *= 1.15; specCam(); return; }
     if (S.mode !== 'play' || anyOv()) return;
     const fly = S.run && S.run.p.fly;
     if (e.key === 'ArrowLeft' || e.key === 'a') { if (fly) S.keyL = 1; else { KA.a = Math.max(-60, KA.a - 3); S.aim = { ai: FT.aIdx(KA.a), pw: KA.p, deg: KA.a }; } }
@@ -332,7 +344,8 @@
       while (S.acc >= FT.DT) { S.acc -= FT.DT; tick(); if (S.mode !== 'play') break; }
       if (Date.now() - S.syncAt > 20000) sync();
     }
-    if (S.lv && (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear')) { camera(dt); draw(cx, VW, VH, dpr, S.cam, now / 1000); if (Date.now() - frontAt > 250) paintFront(); }
+    if (S.mode === 'watch' && !S.paused && !anyOv()) { S.acc += dt * WT.speed; let n = 0; while (S.acc >= FT.DT && n++ < 1200) { S.acc -= FT.DT; watchTick(); } }
+    if (S.lv && (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear' || S.mode === 'watch' || S.mode === 'spec')) { if (S.mode === 'spec') specCam(); else camera(dt); draw(cx, VW, VH, dpr, S.cam, now / 1000); if (Date.now() - frontAt > 250) paintFront(); }
     else drawTitleBg(now / 1000);
   }
   // ---------- カメラ ----------
@@ -445,13 +458,14 @@
       if (!FT.keyOk(lv, k)) continue;   // はみ出して宙に浮いた鉛筆は描かない
       const col = FT.kcol(k), sy = FT.ksy(k), cxw = FT.colX(col);
       if (cxw < ox - 2 || cxw > ox + W2 / s + 2) continue;
-      const ghost = r && !runCor.has(k) && S.mode === 'play';
+      const ghost = r && !runCor.has(k) && (S.mode === 'play' || S.mode === 'watch');
       const capN = lv.cap[Math.floor(cxw)] | 0;
       for (let i = 0, nn = Math.min(30, c.n, FT.capOf(lv, k)); i < nn; i++) drawPencil(g, X(cxw), Y(sy - i * PH.PH), s, k * 7 + i, 0, ghost ? .35 : 1, ink, false);
       if (capN > 0 && c.n >= Math.max(1, capN - 1)) { const ly = Y(sy - capN * PH.PH); g.strokeStyle = c.n >= capN ? 'rgba(224,60,50,.95)' : 'rgba(224,60,50,.5)'; g.lineWidth = Math.max(2, s * .09); g.setLineDash([s * .16, s * .1]); g.beginPath(); g.moveTo(X(cxw - .45), ly); g.lineTo(X(cxw + .45), ly); g.stroke(); g.setLineDash([]); }
     }
+    if (S.mode === 'spec' && SP.d) drawSpecMark(g, X, Y, s, ink, t);
     // 予測線
-    if (r && !r.p.fly && S.aim && S.mode === 'play') {
+    if (r && !r.p.fly && S.aim && (S.mode === 'play' || S.mode === 'watch')) {
       const pr = FT.predict(r.p.x, r.p.y, S.aim.ai, S.aim.pw);
       g.strokeStyle = th === 2 || th === 7 ? 'rgba(255,240,180,.95)' : 'rgba(43,43,51,.75)'; g.lineWidth = Math.max(2, s * .08); g.setLineDash([s * .2, s * .16]);
       g.beginPath(); g.moveTo(X(pr[0][0]), Y(pr[0][1])); for (const q of pr) g.lineTo(X(q[0]), Y(q[1])); g.stroke(); g.setLineDash([]);
@@ -468,7 +482,7 @@
       const p = r.p; let ang = 0;
       if (p.fly) ang = Math.atan2(p.vx, -p.vy);
       else if (S.aim) ang = S.aim.deg * Math.PI / 180 * .5;
-      if (S.mode === 'play' || r.clear) drawPencil(g, X(p.x), Y(p.y + PH.HB), s, 999 + S.life, ang, 1, ink, true, p.fly ? t : 0);
+      if (S.mode === 'play' || S.mode === 'watch' || r.clear) drawPencil(g, X(p.x), Y(p.y + PH.HB), s, 999 + S.life, ang, 1, ink, true, p.fly ? t : 0);
     }
     // 演出
     drawFx(g, X, Y, s, t);
@@ -570,6 +584,8 @@
   function toTitle() {
     if (verNew) { N.flush().catch(() => { }).finally(() => location.reload()); return; }
     for (const o of document.querySelectorAll('.ov')) o.classList.remove('on');
+    $('specBar').classList.remove('on'); $('watchBar').classList.remove('on'); document.body.classList.remove('view');
+    if (S.mode === 'spec') { SP.d = null; try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { } }
     S.mode = 'title'; S.lv = null; S.run = null; scr('title'); document.body.classList.remove('dark'); hint(''); N.flush().catch(() => { });
     SND.bgm(null); refreshWorld().then(paintTitle); loadLive();
   }
@@ -641,12 +657,13 @@
       $('nbTitle').innerHTML = esc(T('第{0}〜{1}層', p * 10 + 1, p * 10 + 10)) + '<small>' + esc(T(LEVELS[p * 10].n)) + '</small>';
       for (let f = p * 10 + 1; f <= p * 10 + 10; f++) {
         const o = firstOf(f), d = document.createElement('div');
-        if (o) { d.className = 'nbr'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>${esc(nameOf(o))}</b><span>${o.x ? '@' + esc(o.x) : ''}</span><em>${esc(when(o.t))}</em>`; }
+        if (o) { d.className = 'nbr'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>${esc(nameOf(o))}</b><span>${o.x ? '@' + esc(o.x) : ''}</span><em>${esc(when(o.t))}</em>` + (!OFFLINE && o.id ? `<button class="nbw" data-w="${f}">${esc(T('▶ 見る'))}</button>` : ''); }
         else if (f === W.latest && !W.done) { d.className = 'nbr front'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>${esc(T('いまの最前線'))}</b>`; }
         else { d.className = 'nbr none'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>……</b>`; }
         box.appendChild(d);
       }
       $('nbFoot').textContent = T('その層をはじめて越えた人の名前が、ここに書かれる。');
+      for (const b of box.querySelectorAll('[data-w]')) b.onclick = () => watchClear(+b.dataset.w);
     } else {
       $('nbTitle').innerHTML = esc(T('卒業生')) + '<small>' + esc(T('第100層を越えた人')) + '</small>';
       const list = (NB.grads && NB.grads.list) || [];
@@ -735,7 +752,8 @@
     else if (res && res.ok === false) { a = `越えられない（${res.why}・${res.need}本足しても届かず・いちばん先 x=${Math.round(res.far || 0)}）`; msg = T('この形では越えられないかもしれません。管理人が確かめます。'); }
     else { a = '自動の判定ができなかった'; msg = T('この端末では調べられませんでした。そのまま管理人に届けます。'); }
     const m = S.run ? Math.round((S.run.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 1000) : 0;
-    try { if (!OFFLINE) await N.report(lv.f, m, a, FT.LANG); $('stText').textContent = msg + ' ' + T('管理人に届けました。ありがとうございます。'); }
+    const ex = { c: FT.corStr(S.cor) }; if (S.run) { ex.x = S.run.p.x; ex.y = S.run.p.y; }
+    try { if (!OFFLINE) await N.report(lv.f, m, a, FT.LANG, ex); $('stText').textContent = msg + ' ' + T('管理人に届けました。ありがとうございます。'); }
     catch (e) { $('stText').textContent = msg + ' ' + T('届けられませんでした（10秒に1回まで）'); $('stGo').disabled = false; }
   };
   // ---------- 管理人への相談 ----------
@@ -765,6 +783,106 @@
   function deadText() { const d = S.deadInfo; if (!d) return ''; return (d.k >= 0 ? T('エンピツライフ 第{0}層で{1}本目の鉛筆になった。名前は「{2}」', d.f, fmt(d.count), d.name) : T('エンピツライフ 第{0}層で「{1}」は砕けた', d.f, d.name)) + '\n' + GAME_URL + '\n' + TAG; }
   function clearText() { const c = S.clearInfo; if (!c) return ''; return (c.opened ? T('エンピツライフ 第{0}層を一番乗りで越えた！', c.f) : T('エンピツライフ 第{0}層を越えた！', c.f)) + '\n' + GAME_URL + '\n' + TAG; }
   function shareX(text) { window.open('https://x.com/intent/post?text=' + encodeURIComponent(text), '_blank', 'noopener'); }
+  // =============================================
+  //  観戦モード（管理画面の「詰みの知らせ」から開く：知らせた人に見えていた鉛筆と、立っていた所を見る）
+  // =============================================
+  const SP = { d: null, then: null, now: null, showNow: false, pts: new Map(), pinch: null };
+  function specFromHash() { const m = /^#spec=(.+)$/.exec(location.hash || ''); if (!m) return null; try { const d = JSON.parse(decodeURIComponent(m[1])); return d && d.f >= 1 && d.f <= 100 ? d : null; } catch (e) { return null; } }
+  async function startSpec(d) {
+    const f = Math.max(1, Math.min(100, d.f | 0)), lv = getLevel(f);
+    for (const o of document.querySelectorAll('.ov')) o.classList.remove('on');
+    S.lv = lv; S.run = null; S.aim = null; S.trail = []; S.fx = []; S.mode = 'spec'; S.paused = false;
+    SP.d = d; SP.then = d.c ? FT.corParse(d.c) : null; SP.now = null; SP.showNow = !SP.then; SP.pts.clear(); SP.pinch = null;
+    S.cor = SP.then || new Map();
+    scr('game'); document.body.classList.add('view'); document.body.classList.toggle('dark', lv.theme === 2 || lv.theme === 7); SND.bgm(null);
+    $('watchBar').classList.remove('on'); $('specBar').classList.add('on'); specFocus(); specHud();
+    if (SP.showNow) await specNow();
+  }
+  async function specNow() {
+    const lv = S.lv; if (!lv) return;
+    if (!SP.now) { hint(T('よみこみ中…')); try { SP.now = OFFLINE ? localCor(lv.f) : await N.loadCells(lv); } catch (e) { SP.now = new Map(); toast(T('みんなの鉛筆を読めませんでした')); } hint(''); }
+    if (S.mode === 'spec' && SP.showNow) S.cor = SP.now;
+    specHud();
+  }
+  // 印の場所（立っていた所。古い知らせは、いちばん先まで行った割合の所）
+  function specPos() { const d = SP.d, lv = S.lv; if (Number.isFinite(d.x) && Number.isFinite(d.y)) return { x: d.x, y: d.y, exact: true }; return { x: lv.start[0] + (lv.goal[0] - lv.start[0]) * Math.max(0, Math.min(1000, d.m | 0)) / 1000, y: lv.start[1] - 2, exact: false }; }
+  function specFocus() { const q = specPos(); S.cam.x = q.x; S.cam.y = q.y - 2; S.cam.z = 16; specCam(); }
+  function specCam() { const lv = S.lv, c = S.cam; if (!lv) return; c.z = Math.max(6, Math.min(48, c.z)); const half = c.z / 2, viewH = (VH / VW) * c.z; c.x = Math.max(half - 2, Math.min(lv.w - half + 2, c.x)); c.y = Math.max(viewH / 2 - 4, Math.min(lv.h - viewH / 2 + 2, c.y)); }
+  function specHud() {
+    const d = SP.d, lv = S.lv; if (!d || !lv) return;
+    $('hFloor').innerHTML = `${esc(T('観戦モード'))} ${esc(T('第{0}層', lv.f))} ${esc(T(lv.name))}<small>${esc(when(d.t))} ・ ${esc(T('いちばん先 {0}%', Math.floor((d.m | 0) / 10)))}${d.a ? ' ・ ' + esc(d.a) : ''}</small>`;
+    $('spTog').textContent = SP.showNow ? T('知らせたときの鉛筆にする') : T('いまの鉛筆にする'); $('spTog').disabled = !SP.then;
+    $('spNote').textContent = SP.showNow ? (SP.then ? T('いまの鉛筆を出しています') : T('この知らせには鉛筆の記録がないので、いまの鉛筆を出しています')) : T('知らせた人に見えていた鉛筆を出しています');
+    paintFront();
+  }
+  $('spTog').onclick = () => { if (!SP.then) return; SP.showNow = !SP.showNow; if (SP.showNow) specNow(); else { S.cor = SP.then; specHud(); } };
+  $('spFocus').onclick = () => specFocus();
+  $('spClose').onclick = () => { if (window.opener && !window.opener.closed) { try { window.close(); } catch (e) { } } setTimeout(() => toTitle(), 150); };
+  function drawSpecMark(g, X, Y, s, ink, t) {
+    const q = specPos(), lv = S.lv, fs = Math.max(12, s * .42);
+    g.font = `900 ${fs}px 'Zen Maru Gothic',sans-serif`; g.textAlign = 'center';
+    if (q.exact) {
+      drawPencil(g, X(q.x), Y(q.y + PH.HB), s, 999, 0, .9, ink, true, 0);
+      g.strokeStyle = `rgba(224,72,62,${.5 + .4 * Math.sin(t * 4)})`; g.lineWidth = 3; g.beginPath(); g.arc(X(q.x), Y(q.y), s * (.95 + .15 * Math.sin(t * 4)), 0, 7); g.stroke();
+      const label = T('ここで知らせた'), tx = X(q.x), ty = Y(q.y) - s * 1.4, w = g.measureText(label).width + fs, h = fs * 1.7;
+      g.fillStyle = 'rgba(255,253,246,.96)'; g.strokeStyle = '#e0483e'; g.lineWidth = 2.5; g.beginPath(); if (g.roundRect) g.roundRect(tx - w / 2, ty - h, w, h, 7); else g.rect(tx - w / 2, ty - h, w, h); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(tx - 6, ty); g.lineTo(tx, ty + 8); g.lineTo(tx + 6, ty); g.closePath(); g.fill(); g.stroke();
+      g.fillStyle = '#e0483e'; g.textBaseline = 'middle'; g.fillText(label, tx, ty - h / 2); g.textBaseline = 'alphabetic';
+    } else {
+      g.strokeStyle = 'rgba(224,72,62,.85)'; g.lineWidth = 3; g.setLineDash([9, 7]); g.beginPath(); g.moveTo(X(q.x), Y(-2)); g.lineTo(X(q.x), Y(lv.h)); g.stroke(); g.setLineDash([]);
+      g.fillStyle = '#e0483e'; g.fillText(T('いちばん先 {0}%', Math.floor((SP.d.m | 0) / 10)), X(q.x), Y(q.y) - s);
+    }
+  }
+  // =============================================
+  //  動きを見る（その層をはじめて越えた人の動きを、その人に見えていた鉛筆のまま、同じ計算で再生する）
+  // =============================================
+  const WT = { c: null, f: 0, name: '', view: null, use: null, gos: [], inp: null, lim: 0, speed: 1, done: false };
+  const parseGos = r => String(r || '').split('.').map(v => /^([0-9a-z]+)g([0-9a-z]+)p([0-9a-z]+)$/.exec(v)).filter(Boolean).map(m => [parseInt(m[1], 36), parseInt(m[2], 36), parseInt(m[3], 36)]);
+  async function watchClear(f) {
+    const o = firstOf(f);
+    if (!o || !o.id || OFFLINE) { toast(T('記録が読めませんでした')); return; }
+    toast(T('記録を読んでいます…'), '', 2500);
+    let c = null; try { c = await N.rest('clear/' + f + '/' + o.id); } catch (e) { c = null; }
+    if (!c || typeof c.r !== 'string') { toast(T('記録が読めませんでした')); return; }
+    const lv = getLevel(f), view = FT.corParse(c.c || ''), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
+    let use = view;
+    if (!FT.replay(lv, view, c.r, lim).clear) {
+      // 見えていた鉛筆のままでは同じにならないとき：確かめ済みの鉛筆だけで（まとめの確かめと同じ形）
+      try { await N.loadCells(lv); const ts = FT.V.trustSnap(lv, view, N.present(lv)); if (FT.replay(lv, ts.m, c.r, lim).clear) use = ts.m; } catch (e) { }
+    }
+    Object.assign(WT, { c, f, name: nameOf(o), view, use, gos: parseGos(c.r), lim });
+    startWatch();
+  }
+  function startWatch() {
+    const lv = getLevel(WT.f);
+    for (const o of document.querySelectorAll('.ov')) o.classList.remove('on');
+    S.lv = lv; S.cor = new Map(WT.view); S.run = new FT.Run(lv, WT.use); WT.inp = FT.Rec.parse(WT.c.r); WT.done = false;
+    S.trail = []; S.fx = []; S.aim = null; S.acc = 0; S.shake = 0;
+    const p = S.run.p; S.cam.x = p.x + 3; S.cam.y = p.y - 2; S.cam.z = 13;
+    S.mode = 'watch'; S.paused = false;
+    scr('game'); document.body.classList.add('view'); document.body.classList.toggle('dark', lv.theme === 2 || lv.theme === 7); SND.bgm(Math.min(10, lv.theme));
+    $('specBar').classList.remove('on'); $('watchBar').classList.add('on'); $('wSpeed').textContent = '×' + WT.speed;
+    $('hFloor').innerHTML = `▶ ${esc(T('第{0}層', lv.f))} ${esc(T(lv.name))}<small>${esc(T('一番乗り「{0}」の動き', WT.name))}</small>`;
+    paintFront();
+  }
+  function watchTick() {
+    const r = S.run; if (!r || r.over || WT.done) return;
+    r.step(WT.inp(r.t + 1));
+    for (const e of r.events) { if (e.k === 'go') { SND.se('jump'); fxGo(); } if (e.k === 'land') { SND.se('grab'); fxLand(); } }
+    r.events.length = 0;
+    if (r.p.fly) { S.trail.push([r.p.x, r.p.y]); if (S.trail.length > 40) S.trail.shift(); S.aim = null; }
+    else { const g = WT.gos.find(q => q[0] > r.t); S.aim = g && g[0] - r.t <= 60 ? { ai: g[1], pw: g[2], deg: g[1] / 2 - PH.AMAX } : null; }
+    if (r.over || r.t >= WT.lim) watchEnd();
+  }
+  function watchEnd() {
+    const r = S.run; if (WT.done) return; WT.done = true; S.aim = null;
+    if (r.clear) { fxClear(); SND.se('clear'); toast(T('鉛筆立てに入った！'), T('{0}秒', (r.t * FT.DT).toFixed(1)), 2600); return; }
+    if (r.place && r.place.k >= 0) { S.cor.set(r.place.k, { n: r.place.n, name: '' }); fxStick(r.place); } else fxBreak(r, r.place || {});
+    r.over = true; toast(T('再生がずれました'), T('この記録は、いまの鉛筆では同じ動きになりませんでした'), 3000);
+  }
+  $('wSpeed').onclick = () => { WT.speed = WT.speed === 1 ? 2 : WT.speed === 2 ? 4 : 1; $('wSpeed').textContent = '×' + WT.speed; };
+  $('wAgain').onclick = () => { if (WT.c) startWatch(); };
+  $('wClose').onclick = () => { toTitle(); openNote(); };
   // ---------- 動画（さいごの数秒を、同じ計算で再生して録画） ----------
   let vidBlob = null;
   async function makeVideo() {
@@ -819,8 +937,10 @@
   window.addEventListener('pagehide', () => N.flush().catch(() => { }));
   i18nAll(); paintTitle();
   requestAnimationFrame(loop);
-  fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; return refreshWorld(); }).then(() => { paintTitle(); loadLive(true); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
+  fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; const sd = specFromHash(); if (sd) startSpec(sd); return refreshWorld(); }).then(() => { paintTitle(); loadLive(true); if (S.mode === 'spec') specHud(); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
   if (!OFFLINE) N.warm();
   // 管理画面などから使う
-  FT.APP = { S, W, ME, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper, paintTitle, hud };
+  FT.APP = { S, W, ME, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper, paintTitle, hud,
+    // 試験用：越えた記録を、読みこまずにそのまま再生する
+    watchRec: (f, c, name) => { const view = FT.corParse(c.c || ''); Object.assign(WT, { c, f, name: name || '', view, use: view, gos: parseGos(c.r), lim: Math.min(120 * 60 * 10, (c.k | 0) + 2) }); startWatch(); } };
 })(window);

@@ -52,7 +52,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  <div class="box"><p>第100層が越えられたら押す。押すと、だれも書きこめなくなる（元にもどせません）。</p><button class="red" id="bEnd">ゲームを終える</button></div>
  <div id="log"></div>
 </div>
-<script src="js/i18n.js?v=8"></script><script src="js/config.js?v=8"></script><script src="js/engine.js?v=8"></script><script src="js/verify.js?v=8"></script><script src="js/net.js?v=8"></script><script src="js/filter.js?v=8"></script>
+<script src="js/i18n.js?v=9"></script><script src="js/config.js?v=9"></script><script src="js/engine.js?v=9"></script><script src="js/verify.js?v=9"></script><script src="js/net.js?v=9"></script><script src="js/filter.js?v=9"></script>
 <script>
 (function(){
 const FT=window.FT,N=FT.NET,$=id=>document.getElementById(id);
@@ -79,8 +79,10 @@ async function reps(){
   rows.sort((a,b)=>b.t-a.t);
   if(!rows.length){$('reps').textContent='知らせはありません';return;}
   let h='<table><tr><th>時刻</th><th>層</th><th>いちばん先</th><th>自動の判定</th><th></th></tr>';
-  for(const r of rows.slice(0,80)){const nw=r.t>(seen[r.f]||0),bad=/越えられない/.test(r.a);h+=`<tr class="${nw?'new':''}"><td>${tm(r.t)}</td><td>${r.f}</td><td>${Math.round(r.m/10)}%</td><td class="${bad?'ng':'okc'}">${esc(r.a)}</td><td><button data-seen="${r.f}" data-t="${r.t}">見た</button></td></tr>`;}
-  $('reps').innerHTML=h+'</table><button id="bRepDel">見た層の知らせを消す</button>';
+  const top=rows.slice(0,80);
+  top.forEach((r,i)=>{const nw=r.t>(seen[r.f]||0),bad=/越えられない/.test(r.a);h+=`<tr class="${nw?'new':''}"><td>${tm(r.t)}</td><td>${r.f}</td><td>${Math.round(r.m/10)}%</td><td class="${bad?'ng':'okc'}">${esc(r.a)}</td><td><button data-spec="${i}" title="${r.c?'知らせた人に見えていた鉛筆と、立っていた所を見る':'いまの鉛筆で、いちばん先まで行った所を見る（前の形の知らせ）'}">見に行く${r.c?'':'＊'}</button> <button data-seen="${r.f}" data-t="${r.t}">見た</button></td></tr>`;});
+  $('reps').innerHTML=h+'</table><p class="small">「見に行く」は、ゲームを観戦モードで開きます（知らせた人に見えていた鉛筆と、立っていた所に印）。＊の知らせは前の形なので、いまの鉛筆と、いちばん先まで行った所の線だけです。</p><button id="bRepDel">見た層の知らせを消す</button>';
+  $('reps').querySelectorAll('[data-spec]').forEach(b=>b.onclick=()=>{const r=top[+b.dataset.spec];const d={f:r.f,c:r.c||'',m:r.m,a:r.a,t:r.t};if(typeof r.x==='number'&&typeof r.y==='number'){d.x=r.x;d.y=r.y;}window.open('index.html#spec='+encodeURIComponent(JSON.stringify(d)),'_blank');});
   $('reps').querySelectorAll('[data-seen]').forEach(b=>b.onclick=async()=>{await N.repSeen(+b.dataset.seen,+b.dataset.t);reps();});
   $('bRepDel').onclick=async()=>{for(const f in seen)await N.repDel(f).catch(()=>{});reps();};
 }

@@ -361,6 +361,15 @@
         "l": {
           ".validate": "newData.isString() && newData.val().matches(/^(ja|en|zh|ko)$/)"
         },
+        "c": {
+          ".validate": "newData.isString() && newData.val().length <= 30000"
+        },
+        "x": {
+          ".validate": "newData.isNumber() && newData.val() >= -10 && newData.val() <= 5000"
+        },
+        "y": {
+          ".validate": "newData.isNumber() && newData.val() >= -50 && newData.val() <= 500"
+        },
         "$other": {
           ".validate": false
         }

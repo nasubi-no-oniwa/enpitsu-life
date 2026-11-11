@@ -16,7 +16,7 @@ const ADMIN = "(auth != null && root.child('ft_admin/key').exists() && root.chil
 const OPEN = "!root.child('el/end').exists()";
 // 鉛筆は30本まで積める（それより上は計算でもはじかれる）
 el.cells.$f.$k['.validate'] = el.cells.$f.$k['.validate'].replace("newData.child('n').isNumber()", "newData.child('n').isNumber() && newData.child('n').val() <= 30");
-// 詰みの知らせ：rep/{層}/{番号} { t, u, m：いちばん先まで行った割合, a：自動の判定, l：言葉 }。1人10秒に1回まで（u の r）
+// 詰みの知らせ：rep/{層}/{番号} { t, u, m：いちばん先まで行った割合, a：自動の判定, l：言葉, c・x・y：観戦モード用（なくてもよい） }。1人10秒に1回まで（u の r）
 el.u.$uid.r = { '.write': `${OPEN} && auth != null && auth.uid === $uid && newData.exists()`, '.validate': "newData.isNumber() && newData.val() === now && (!data.exists() || now - data.val() >= 10000)" };
 el.rep = {
   '.read': ADMIN,
@@ -29,6 +29,10 @@ el.rep = {
       m: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000' },
       a: { '.validate': "newData.isString() && newData.val().length <= 300" },
       l: { '.validate': "newData.isString() && newData.val().matches(/^(ja|en|zh|ko)$/)" },
+      // 観戦モード用（なくてもよい）：c：知らせた人に見えていた鉛筆、x・y：そのとき立っていた所
+      c: { '.validate': "newData.isString() && newData.val().length <= 30000" },
+      x: { '.validate': 'newData.isNumber() && newData.val() >= -10 && newData.val() <= 5000' },
+      y: { '.validate': 'newData.isNumber() && newData.val() >= -50 && newData.val() <= 500' },
       $other: { '.validate': false },
     },
   },
