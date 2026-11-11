@@ -17,6 +17,12 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 .bd .bh{font-size:12px;opacity:.85;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .bd .bh button{margin-left:auto;font-size:12px;padding:2px 8px}
 #bdPin{border:2px solid #e0483e;border-radius:10px;padding:6px 8px;background:#fff4f2;font-size:13px;margin:6px 0}
+#tabs{position:sticky;top:0;z-index:5;background:#f6f1e3;display:flex;gap:4px;flex-wrap:wrap;padding:6px 0 8px;border-bottom:2px solid #2b2b33;margin-bottom:6px}
+#tabs button{margin:0;padding:5px 9px;font-size:13px}
+#tabs button.on{background:#f5c84c;font-weight:900}
+#tabs button i{font-style:normal;color:#fff;background:#e0483e;border-radius:9px;padding:0 6px;margin-left:4px;font-size:11px}
+.sec[hidden]{display:none}
+#onNum{font-size:34px;font-weight:900;line-height:1.1}#onNum small{font-size:14px;font-weight:500}
 </style></head><body>
 <h1>エンピツライフ 管理</h1>
 <div class="box" id="login">
@@ -24,6 +30,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  <input id="key" type="password" autocomplete="off"><button id="bLogin">入る</button>
 </div>
 <div id="main" hidden>
+ <h2>同接</h2><div class="box"><div id="onNum">…</div><div id="onList"></div><p class="small">ゲームを開いている人（見えている画面だけ）が1分ごとに「いる」と知らせ、ここで2分半以内に知らせた人を数えます。30秒ごとに読みなおします。新しい版（今日の20時ごろ）より前に開いたままのページは数えられません。</p><button id="bOn">いま読みなおす</button></div>
  <h2>ようす</h2><div class="box" id="status">…</div><button id="bRe">読みなおす</button>
  <h2>詰みの知らせ</h2><div class="box" id="reps">…</div>
  <h2>管理人への相談</h2><div class="box" id="asks">…</div>
@@ -52,7 +59,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  <div class="box"><p>第100層が越えられたら押す。押すと、だれも書きこめなくなる（元にもどせません）。</p><button class="red" id="bEnd">ゲームを終える</button></div>
  <div id="log"></div>
 </div>
-<script src="js/i18n.js?v=9"></script><script src="js/config.js?v=9"></script><script src="js/engine.js?v=9"></script><script src="js/verify.js?v=9"></script><script src="js/net.js?v=9"></script><script src="js/filter.js?v=9"></script>
+<script src="js/i18n.js?v=10"></script><script src="js/config.js?v=10"></script><script src="js/engine.js?v=10"></script><script src="js/verify.js?v=10"></script><script src="js/net.js?v=10"></script><script src="js/filter.js?v=10"></script>
 <script>
 (function(){
 const FT=window.FT,N=FT.NET,$=id=>document.getElementById(id);
@@ -62,7 +69,29 @@ const log=s=>{$('log').textContent=tm(Date.now())+' '+s+'\n'+$('log').textConten
 async function login(){const k=$('key').value.trim();if(!k)return;try{await N.adminLogin(k);sessionStorage.setItem('el_ak',k);$('login').hidden=true;$('main').hidden=false;load();}catch(e){alert('入れませんでした（かぎがちがうかもしれません）');}}
 $('bLogin').onclick=login;
 const sk=sessionStorage.getItem('el_ak');if(sk){$('key').value=sk;login();}
-async function load(){status();reps();asks();lives();posts(true);nbook();}
+async function load(){online();status();reps();asks();lives();posts(true);nbook();}
+// ---------- 同接（いま遊んでいる人） ----------
+async function online(){
+  let v=null;try{v=await N.online(150000);}catch(e){$('onNum').textContent='読めませんでした';return;}
+  const by={};let n=0;for(const k in v||{}){const o=v[k];if(!o||typeof o.t!=='number')continue;n++;const f=o.f|0;by[f]=(by[f]||0)+1;}
+  $('onNum').innerHTML=`${n.toLocaleString()}<small> 人（${tm(Date.now())}）</small>`;
+  const ks=Object.keys(by).map(Number).sort((a,b)=>a-b);
+  $('onList').innerHTML=ks.length?'<table><tr><th>いる所</th><th>人</th></tr>'+ks.map(f=>`<tr><td>${f===0?'タイトルなど':'第'+f+'層'}</td><td>${by[f]}</td></tr>`).join('')+'</table>':'';
+  badge('同接',n,true);
+}
+$('bOn').onclick=online;
+setInterval(()=>{if(!document.hidden&&!$('main').hidden)online();},30000);
+// ---------- 項目をタブにする（えらんだ項目だけ見せる。「すべて」で全部） ----------
+const TB={};
+function badge(name,n,plain){const b=TB[name];if(!b)return;b.querySelector('i')&&b.querySelector('i').remove();if(n>0){const i=document.createElement('i');i.textContent=n;if(plain)i.style.background='#2b2b33';b.appendChild(i);}}
+(function(){
+  const main=$('main'),hs=[...main.querySelectorAll(':scope > h2')],bar=document.createElement('div');bar.id='tabs';main.insertBefore(bar,main.firstChild);
+  const secs=hs.map(h=>{const s=document.createElement('section');s.className='sec';h.parentNode.insertBefore(s,h);const parts=[];let n=h;do{parts.push(n);n=n.nextElementSibling;}while(n&&n.tagName!=='H2'&&n.id!=='log'&&n.tagName!=='SECTION');parts.forEach(p=>s.appendChild(p));return{name:h.textContent.trim(),s};});
+  const show=name=>{for(const x of secs)x.s.hidden=!(name==='すべて'||x.name===name);for(const k in TB)TB[k].classList.toggle('on',k===name);try{localStorage.setItem('el_admin_tab',name);}catch(e){}window.scrollTo(0,0);};
+  for(const name of secs.map(x=>x.name).concat(['すべて'])){const b=document.createElement('button');b.textContent=name;b.onclick=()=>show(name);bar.appendChild(b);TB[name]=b;}
+  let first='同接';try{const v=localStorage.getItem('el_admin_tab');if(v&&TB[v])first=v;}catch(e){}
+  show(first);
+})();
 $('bRe').onclick=load;
 async function status(){
   const [op,st,ck,end]=await Promise.all([N.rest('open').catch(()=>null),N.rest('stat').catch(()=>null),N.rest('ckpt').catch(()=>null),N.rest('end').catch(()=>null)]);
@@ -77,6 +106,7 @@ async function reps(){
   let v={},seen={};try{v=await N.reports();seen=await N.restMe('repok')||{};}catch(e){$('reps').textContent='読めませんでした';return;}
   const rows=[];for(const f in v)for(const id in v[f]){const r=v[f][id];if(r)rows.push(Object.assign({f:+f,id},r));}
   rows.sort((a,b)=>b.t-a.t);
+  badge('詰みの知らせ',rows.filter(r=>r.t>(seen[r.f]||0)).length);
   if(!rows.length){$('reps').textContent='知らせはありません';return;}
   let h='<table><tr><th>時刻</th><th>層</th><th>いちばん先</th><th>自動の判定</th><th></th></tr>';
   const top=rows.slice(0,80);
@@ -90,6 +120,7 @@ async function asks(){
   let v={};try{v=await N.asks();}catch(e){$('asks').textContent='読めませんでした';return;}
   const seen=+(localStorage.getItem('el_askseen')||0),L={ja:'日本語',en:'英語',zh:'中国語',ko:'韓国語'};
   const rows=Object.entries(v||{}).map(([id,r])=>Object.assign({id},r)).filter(r=>r&&r.m).sort((a,b)=>b.t-a.t);
+  badge('管理人への相談',rows.filter(r=>r.t>seen).length);
   if(!rows.length){$('asks').textContent='相談はありません';return;}
   let h='<table><tr><th>時刻</th><th>最前線</th><th>言葉</th><th>X</th><th>文</th><th></th></tr>';
   for(const r of rows.slice(0,100))h+=`<tr class="${r.t>seen?'new':''}"><td>${tm(r.t)}</td><td>${r.f|0}</td><td>${L[r.l]||esc(r.l)}</td><td>${r.x?`<a href="https://x.com/${esc(r.x)}" target="_blank" rel="noopener">@${esc(r.x)}</a>`:''}</td><td style="white-space:pre-wrap">${esc(r.m)}</td><td><button class="red" data-ask="${esc(r.id)}">消す</button></td></tr>`;

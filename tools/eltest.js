@@ -90,6 +90,8 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   const asks = await NA.asks().catch(() => null); const aid = asks && Object.keys(asks)[0];
   ok(asks && Object.keys(asks).length === 1 && asks[aid].x === 'nasubiP' && asks[aid].f === 3, '管理人は相談を読める');
   await NA.askDel(aid).then(() => ok(true, '管理人は相談を消せる')).catch(e => ok(false, '相談を消せない ' + e.message));
+  { await NB.ping(3); await sleep(200); const on = await NA.online(60000).catch(e => ({ err: e.message })); const v = on && Object.values(on); ok(v && v.length === 1 && v[0].f === 3, '同接：遊んでいる人と層が数えられる'); }
+  { const r = await fetch(`http://127.0.0.1:${PORT}/el/on.json?ns=g`); ok(r.status === 401, 'ふつうの人は、同接を読めない'); }
   const reps = await NA.reports().catch(() => null); ok(reps && reps[1] && Object.keys(reps[1]).length === 1, '管理人は詰みの知らせを読める');
   { const r2 = reps && reps[2] && Object.values(reps[2])[0]; ok(r2 && r2.c === '1a.2b.3c' && r2.x === 12.34 && r2.y === 8.5, '観戦用の中身（鉛筆・立っていた所）が読める'); const r1 = reps && reps[1] && Object.values(reps[1])[0]; ok(r1 && r1.c === undefined, '前の形の知らせ（観戦用の中身なし）もそのまま'); }
   await NA.liveAdd('なすP', 'https://youtube.com/live/abc', 'いま配信中').then(() => ok(true, '配信中を書けた')).catch(e => ok(false, '配信中を書けない ' + e.message));

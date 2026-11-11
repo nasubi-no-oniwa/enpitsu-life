@@ -37,6 +37,17 @@ el.rep = {
     },
   },
 };
+// いま遊んでいる人（同接）：on/{匿名ID} { t：最後に見えていた時刻, f：いる層（0はタイトル） }。管理人だけ読める。1人20秒に1回まで
+el.on = {
+  '.read': ADMIN, '.indexOn': ['t'],
+  $uid: {
+    '.write': `(auth != null && auth.uid === $uid && newData.exists()) || (!newData.exists() && ${ADMIN})`,
+    '.validate': "newData.hasChildren(['t', 'f']) && newData.child('t').val() === now && (!data.exists() || now - data.child('t').val() >= 20000)",
+    t: { '.validate': 'newData.isNumber()' },
+    f: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 101' },
+    $other: { '.validate': false },
+  },
+};
 // 管理人への相談：ask/{番号} { t, u, m：文（300文字まで）, x：XのID, l：言葉, f：最前線の層 }。1人1分に1回まで（u の a）。ゲームが終わったあとも送れる
 el.u.$uid.a = { '.write': "auth != null && auth.uid === $uid && newData.exists()", '.validate': "newData.isNumber() && newData.val() === now && (!data.exists() || now - data.val() >= 60000)" };
 el.ask = {

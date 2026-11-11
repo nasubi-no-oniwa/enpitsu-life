@@ -376,6 +376,25 @@
       }
     }
   },
+  "on": {
+    ".read": "(auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val())",
+    ".indexOn": [
+      "t"
+    ],
+    "$uid": {
+      ".write": "(auth != null && auth.uid === $uid && newData.exists()) || (!newData.exists() && (auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val()))",
+      ".validate": "newData.hasChildren(['t', 'f']) && newData.child('t').val() === now && (!data.exists() || now - data.child('t').val() >= 20000)",
+      "t": {
+        ".validate": "newData.isNumber()"
+      },
+      "f": {
+        ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 101"
+      },
+      "$other": {
+        ".validate": false
+      }
+    }
+  },
   "ask": {
     ".read": "(auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val())",
     ".indexOn": [

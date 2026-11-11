@@ -348,6 +348,22 @@
     }
     lastR = Date.now();
   };
+  // =============================================
+  //  いま遊んでいる人（同接）：見えている間、1分ごとに on/{匿名ID} に「いる」と書く。管理画面で数える
+  // =============================================
+  let lastPing = 0;
+  N.ping = async function (f) {
+    if (!N.ready() || N.frozen || Date.now() - lastPing < 20500) return;
+    lastPing = Date.now();
+    try { await N.token(); const uid = N.uid(); await update({ ['on/' + uid]: { t: SV, f: Math.max(0, Math.min(101, f | 0)) } }); } catch (e) { }
+  };
+  // 管理人：ms より新しく「いる」と書いた人（{ 匿名ID: { t, f } }）
+  N.online = async function (ms) {
+    const t = await N.token(false), qs = q2s({ orderBy: 't', startAt: Date.now() - (ms || 150000) });
+    const r = await Promise.race([fetch(DB() + '/' + P + 'on.json?auth=' + encodeURIComponent(t) + '&' + qs + NS(), { cache: 'no-store' }), late(12000)]);
+    if (!r.ok) throw new Error('http ' + r.status);
+    return (await r.json()) || {};
+  };
   N.reports = async function () { const v = await restMe('rep'); return v || {}; };
   N.repSeen = (f, t) => update({ ['repok/' + f]: t });
   N.repDel = f => update({ ['rep/' + f]: null });

@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '9';
+  FT.VER = '10';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -933,6 +933,10 @@
   // =============================================
   //  はじまり
   // =============================================
+  // いま遊んでいる人の数（管理画面の同接）：見えている間、1分ごとに「いる」と知らせる（タイトルは0、遊んでいる層の番号）
+  const pingNow = () => { if (OFFLINE || document.hidden) return; N.ping(S.mode === 'title' || !S.lv ? 0 : S.lv.f); };
+  setInterval(pingNow, 60000); setTimeout(pingNow, 5000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(pingNow, 1500); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { N.flush().catch(() => { }); if (S.mode === 'play') S.paused = true; } else if (S.mode === 'play' && !anyOv()) S.paused = false; });
   window.addEventListener('pagehide', () => N.flush().catch(() => { }));
   i18nAll(); paintTitle();
