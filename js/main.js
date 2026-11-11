@@ -525,7 +525,7 @@
   function drawPencil(g, x, y, s, seed, ang, alpha, ink, me, fly, tier) {
     const w = s * .34, h = s * PH.PH, cols = ['#f5c84c', '#4f9be0', '#e65f4f', '#5cbf6a', '#b07cd8', '#ff9f43', '#ff8fab', '#7ad0c4'];
     tier = tier | 0;
-    const tt = performance.now() / 1000;
+    const tt = S.pv && S.pvT !== undefined ? S.pvT : performance.now() / 1000;   // PVを作るときは、こまの時刻で動かす
     let col = me ? '#f5c84c' : cols[Math.floor(hash(seed, 3) * cols.length)];
     g.save(); g.globalAlpha = alpha; g.translate(x, y); g.rotate(ang);
     if (tier > 0 && alpha > .5) shineBack(g, s, w, h, tier, seed, tt);
