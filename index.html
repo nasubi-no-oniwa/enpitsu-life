@@ -139,6 +139,15 @@ function vis(e){if(!e||!e.isConnected||e.closest('[hidden]'))return false;var r=
 var was={};setInterval(function(){try{var any=false;for(var i=0;i<IDS.length;i++){if(vis(document.getElementById(IDS[i])))any=true;}if(any&&!was.v)ev('result_view');was.v=any;}catch(e){}},700);
 }catch(e){}})();</script>
 <!-- nasubi-ad: スマホのとき、結果画面とタイトル画面の決めた場所に広告の帯（と、決めた場所だけその下に大きい広告）を出す（遊んでいる最中は出さない・ボタンに重ねない・広告の幅320pxを切らない・画面が出たらすぐ見せるが、最初の1.2秒は押しても反応しない・画面が出るたびに読みこみ直す（場所ごとに30秒に1回まで）・画面が切りかわった瞬間に調べる・広告の会社とのつなぎを先にしておく（広告そのものは先に読みこまない）） -->
+<script>/* 広告が出ないときの調べ（?addebug=1 のときだけ画面の下に出す。広告そのものには何もしない） */
+(function(){if(!/[?&]addebug=1/.test(location.search))return;
+function run(){var p=document.createElement('div');p.style.cssText='position:fixed;left:6px;right:6px;top:calc(env(safe-area-inset-top) + 44px);z-index:99999;opacity:.93;background:#fff;border:2px solid #e0483e;border-radius:10px;padding:8px;font:12px/1.5 sans-serif;color:#222;max-height:46vh;overflow:auto;white-space:pre-wrap;pointer-events:none';document.body.appendChild(p);
+function up(){var ua=navigator.userAgent||'',mob=/iPhone|iPod|Android|Mobile|Windows Phone|BlackBerry/i.test(ua),bx=document.querySelectorAll('.nsb-ad'),out=['【広告の調べ】','名乗り: '+ua,'スマホと判定: '+(mob?'はい':'いいえ（このときは広告の箱を作らない）'),'広告の箱: '+bx.length+'個'];
+for(var i=0;i<bx.length;i++){var b=bx[i],r=b.getBoundingClientRect(),f=b.querySelector('iframe'),s='['+(i+1)+'] '+(b.classList.contains('nsb-big')?'大きい広告 ':'帯 ')+Math.round(r.width)+'×'+Math.round(r.height)+'・上から'+Math.round(r.top)+'px'+(b.style.display==='none'?'（いまはかくしている）':'');
+if(!f)s+='・まだ中身なし（この画面がまだ出ていない）';else{s+='・見える:'+(f.style.visibility==='visible'?'はい':'いいえ')+'・押せる:'+(f.style.pointerEvents==='auto'?'はい':'まだ');try{var d=f.contentDocument,w=f.contentWindow,res=w.performance.getEntriesByType('resource').filter(function(e){return /shinobi|admax|ninja/.test(e.name);});s+='\n    広告の会社からの読みこみ: '+(res.length?res.length+'件':'0件（ブロックされているかも）');var n=d?d.querySelectorAll('img,iframe,a,ins,video,canvas').length:-1;s+='・中の絵や枠: '+n+'個・高さ '+(d&&d.body?d.body.scrollHeight:'?')+'px';}catch(e){s+='・中を見られない '+e.message;}}
+out.push(s);}p.textContent=out.join('\n');}
+up();setInterval(up,1500);}
+if(document.body)run();else document.addEventListener('DOMContentLoaded',run);})();</script>
 <script>(function(){try{var C=[{"a": "#oDead .card", "v": "#oDead"}, {"a": "#oClear .card", "v": "#oClear"}, {"a": "#title .note", "v": "#title", "t": 1, "b": 1, "m": 20, "x": "", "x2": ""}],BIG=1,M=20,EX="",EX2="",AD='https://nasubi-no-oniwa.github.io/ad/',AD2='https://nasubi-no-oniwa.github.io/ad/big.html',LOCK=1200,MIN=30000;
 if(/[?&]noad=1/.test(location.search))return;
 if(!/iPhone|iPod|Android|Mobile|Windows Phone|BlackBerry/i.test(navigator.userAgent||''))return;
