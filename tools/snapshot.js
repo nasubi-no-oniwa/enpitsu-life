@@ -33,7 +33,7 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
   const OPEN = obj(open), STAT = obj(stat), RM = obj(rm), RS = obj(rs);
   let mTop = 0; for (const k in OPEN) if (+k > mTop && +k <= 100) mTop = +k;
   const idx = { at, top: Math.min(101, mTop + 1), end: end && typeof end === 'object' ? end : null, ckpt: typeof ckpt === 'number' ? ckpt : null, open: {}, stat: STAT, ok: {}, floors: Object.assign({}, prevIdx.floors || {}), vc: Object.assign({}, prevIdx.vc || {}) };
-  for (const f in OPEN) idx.open[f] = { t: OPEN[f].t, n: String(OPEN[f].n || '').slice(0, 12), x: String(OPEN[f].x || '').slice(0, 15), id: OPEN[f].id };
+  for (const f in OPEN) idx.open[f] = { t: OPEN[f].t, n: String(OPEN[f].n || '').slice(0, 12), w: String(OPEN[f].w || '').slice(0, 12), x: String(OPEN[f].x || '').slice(0, 15), id: OPEN[f].id };
   const top = Math.min(100, idx.top), states = {};
   for (let f = 1; f <= top; f++) {
     const file = path.join(OUT, 'f' + f + '.json'), prev = readJ(file, null);
@@ -55,8 +55,13 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
   const prevOk = prevIdx.ok || {};
   for (let f = 1; f <= 100; f++) {
     const o = idx.open[f]; if (!o) break;
-    if (idx.ckpt !== null && f <= idx.ckpt) { idx.ok[f] = { t: o.t, id: o.id, n: o.n, x: o.x }; continue; }
-    if (prevOk[f] && prevOk[f].t === o.t) { idx.ok[f] = Object.assign({}, prevOk[f], { x: prevOk[f].id === o.id ? o.x : prevOk[f].x }); continue; }
+    if (idx.ckpt !== null && f <= idx.ckpt) { idx.ok[f] = { t: o.t, id: o.id, n: o.n, w: o.w, x: o.x }; continue; }
+    if (prevOk[f] && prevOk[f].t === o.t) {
+      const same = prevOk[f].id === o.id, q = Object.assign({}, prevOk[f], same ? { n: o.n, w: o.w, x: o.x } : {});
+      // 本当の一番乗りが「開いた印」を書いた人とちがうとき：書いて15分のあいだは、その人の名前を読みなおす
+      if (!same && Date.now() - (q.ct || q.t) < 20 * 60000) { const c = await rest('clear/' + f + '/' + q.id).catch(() => null); if (c) { q.n = String(c.n || '名無し').slice(0, 12); q.w = String(c.w || '').slice(0, 12); q.x = String(c.x || '').slice(0, 15); } }
+      idx.ok[f] = q; continue;
+    }
     const S = states[f]; if (!S) break;
     const present = V.presentOf(S.st, S.raw);
     let cur = idx.vc[f] && idx.vc[f].k === o.t ? idx.vc[f].t : 0, found = null;
@@ -69,9 +74,27 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
     }
     idx.vc[f] = { t: cur, k: o.t };
     if (!found) break;
-    idx.ok[f] = { t: o.t, id: found.id, n: String(found.n || '名無し').slice(0, 12), x: String(found.x || '').slice(0, 15) };
+    idx.ok[f] = { t: o.t, ct: found.t, id: found.id, n: String(found.n || '名無し').slice(0, 12), w: found.id === o.id ? o.w : String(found.w || '').slice(0, 12), x: found.id === o.id ? o.x : String(found.x || '').slice(0, 15) };
   }
   let L = 1; while (L <= 100 && idx.ok[L]) L++; idx.vtop = Math.min(101, L);
   fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(idx));
-  console.log('確かめ済みの高さ', idx.vtop, '開いた', Object.keys(idx.open).length, '層ファイル', Object.keys(idx.floors).length, 'かかった時間', ((Date.now() - T0) / 1000).toFixed(1) + '秒');
+  // 卒業生：第100層を越えた記録を、古い順に再生して確かめ、本物だけ並べる（ノートの最後のページ）
+  const gfile = path.join(OUT, 'grads.json'), G = readJ(gfile, { cur: 0, list: [] });
+  if (states[100] && idx.ok[100]) {
+    const present = V.presentOf(states[100].st, states[100].raw);
+    for (let page = 0; page < 30 && Date.now() - T0 < LIMIT; page++) {
+      const v = await rest('clear/100', { orderBy: 't', startAt: G.cur + 1, limitToFirst: 10 });
+      const list = Object.entries(v || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => typeof c.t === 'number' && c.t > G.cur).sort((a, b) => a.t - b.t);
+      if (!list.length) break;
+      for (const c of list) { if (V.verifyClear(floors[99], c, present)) G.list.push({ id: c.id, t: c.t, n: String(c.n || '名無し').slice(0, 12), w: String(c.w || '').slice(0, 12), x: String(c.x || '').slice(0, 15) }); G.cur = c.t; }
+      if (list.length < 10) break;
+    }
+    // 書いて15分のあいだは、名前とXのIDを読みなおす
+    for (const g of G.list) if (Date.now() - g.t < 20 * 60000) { const [w, x] = await Promise.all([rest('clear/100/' + g.id + '/w').catch(() => null), rest('clear/100/' + g.id + '/x').catch(() => null)]); if (typeof w === 'string') g.w = w.slice(0, 12); if (typeof x === 'string') g.x = x.slice(0, 15); }
+  }
+  // 管理人が「名無し」にした卒業生
+  const gb = await rest('gb').catch(() => null);
+  for (const g of G.list) if (gb && gb[g.id]) { g.n = '名無し'; g.w = ''; g.x = ''; }
+  G.at = at; fs.writeFileSync(gfile, JSON.stringify(G));
+  console.log('確かめ済みの高さ', idx.vtop, '開いた', Object.keys(idx.open).length, '層ファイル', Object.keys(idx.floors).length, '卒業生', G.list.length, 'かかった時間', ((Date.now() - T0) / 1000).toFixed(1) + '秒');
 })().catch(e => { console.error(e); process.exit(1); });

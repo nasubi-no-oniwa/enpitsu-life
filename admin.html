@@ -11,6 +11,12 @@ input,textarea{font:inherit;padding:6px;border:2px solid #2b2b33;border-radius:8
 table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #d7cfb8;padding:4px;text-align:left;vertical-align:top}
 .new{background:#fff4c2}.small{font-size:12px;opacity:.8}.ng{color:#c0392b;font-weight:900}.okc{color:#1f7a3a;font-weight:900}
 #log{white-space:pre-wrap;font-size:12px}
+#posts{max-height:60vh;overflow:auto;border:2px solid #2b2b33;border-radius:10px;background:#fff;padding:6px;margin:8px 0}
+.bd{padding:6px 4px;border-bottom:1px dashed #c9c2ad;font-size:14px;line-height:1.45;word-break:break-all}
+.bd:last-child{border:0}.bd.hid{background:#fff1ef}
+.bd .bh{font-size:12px;opacity:.85;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bd .bh button{margin-left:auto;font-size:12px;padding:2px 8px}
+#bdPin{border:2px solid #e0483e;border-radius:10px;padding:6px 8px;background:#fff4f2;font-size:13px;margin:6px 0}
 </style></head><body>
 <h1>エンピツライフ 管理</h1>
 <div class="box" id="login">
@@ -35,12 +41,18 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
   <button id="bLive">配信中に出す</button></div>
  <h2>掲示板</h2>
  <div class="box">お知らせ（掲示板のいちばん上に出る。空にすると消える）<textarea id="pin" rows="2" maxlength="300"></textarea><button id="bPin">お知らせを入れる</button>
-  <div id="posts"></div></div>
+  <p class="small">ゲームの中の掲示板と同じ並び（下ほど新しい）。12秒ごとに読みなおします。<span class="ng">赤字</span>はみんなには見えていない投稿（通報3回以上・見せられない言葉）。</p>
+  <div id="bdPin" hidden></div>
+  <div id="posts"></div>
+  <label class="small"><input type="checkbox" id="bdAuto" checked style="width:auto"> 12秒ごとに読みなおす</label> <button id="bdRe">いま読みなおす</button></div>
+ <h2>一番乗りノート</h2>
+ <div class="box"><p class="small">各層の一番乗りと、卒業生（第100層を越えた人）。ふさわしくない名前は「名無しにする」で消せます（ゲームには15分以内に出ます）。</p>
+  <button id="bNb">読む</button><div id="nb"></div></div>
  <h2>終わり</h2>
  <div class="box"><p>第100層が越えられたら押す。押すと、だれも書きこめなくなる（元にもどせません）。</p><button class="red" id="bEnd">ゲームを終える</button></div>
  <div id="log"></div>
 </div>
-<script src="js/i18n.js"></script><script src="js/config.js"></script><script src="js/engine.js"></script><script src="js/verify.js"></script><script src="js/net.js"></script>
+<script src="js/i18n.js?v=4"></script><script src="js/config.js?v=4"></script><script src="js/engine.js?v=4"></script><script src="js/verify.js?v=4"></script><script src="js/net.js?v=4"></script><script src="js/filter.js?v=4"></script>
 <script>
 (function(){
 const FT=window.FT,N=FT.NET,$=id=>document.getElementById(id);
@@ -50,7 +62,7 @@ const log=s=>{$('log').textContent=tm(Date.now())+' '+s+'\n'+$('log').textConten
 async function login(){const k=$('key').value.trim();if(!k)return;try{await N.adminLogin(k);sessionStorage.setItem('el_ak',k);$('login').hidden=true;$('main').hidden=false;load();}catch(e){alert('入れませんでした（かぎがちがうかもしれません）');}}
 $('bLogin').onclick=login;
 const sk=sessionStorage.getItem('el_ak');if(sk){$('key').value=sk;login();}
-async function load(){status();reps();asks();lives();posts();}
+async function load(){status();reps();asks();lives();posts(true);nbook();}
 $('bRe').onclick=load;
 async function status(){
   const [op,st,ck,end]=await Promise.all([N.rest('open').catch(()=>null),N.rest('stat').catch(()=>null),N.rest('ckpt').catch(()=>null),N.rest('end').catch(()=>null)]);
@@ -90,7 +102,30 @@ $('bReset').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層の�
 $('bCkpt').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層までを確かめ済みにしますか？`))return;await N.setCkpt(f);log(`第${f}層までを確かめ済みにした`);status();};
 async function lives(){const L=await N.live().catch(()=>[]);$('lives').innerHTML=L.length?L.map(x=>`<div>● ${esc(x.n)} <a href="${esc(x.u)}" target="_blank">${esc(x.u)}</a> ${esc(x.m)} <button data-id="${x.id}">消す</button></div>`).join(''):'<p class="small">いまはだれも出ていません</p>';$('lives').querySelectorAll('[data-id]').forEach(b=>b.onclick=async()=>{await N.liveDel(b.dataset.id);lives();});}
 $('bLive').onclick=async()=>{try{await N.liveAdd($('lvN').value,$('lvU').value,$('lvM').value);$('lvN').value=$('lvU').value=$('lvM').value='';lives();log('配信中に出した');}catch(e){alert(e.message);}};
-async function posts(){N.boardPin().then(p=>{$('pin').value=typeof p==='string'?p:'';});const v=await N.boardRead('all',0).catch(()=>[]);$('posts').innerHTML='<table>'+v.slice().reverse().map(c=>`<tr><td class="small">${tm(c.t)}</td><td>${esc(c.n)}</td><td>${esc(c.m)}${(c.r|0)?` <span class="ng">通報${c.r}</span>`:''}</td><td><button data-id="${c.id}">消す</button></td></tr>`).join('')+'</table>';$('posts').querySelectorAll('[data-id]').forEach(b=>b.onclick=async()=>{await N.boardDel('all',b.dataset.id);posts();});}
+const B={list:[],last:0,timer:0};const LG={ja:'日本語',en:'英語',zh:'中国語',ko:'韓国語'};
+async function posts(full){
+  N.boardPin().then(p=>{if(document.activeElement!==$('pin'))$('pin').value=typeof p==='string'?p:'';const e=$('bdPin');e.hidden=!(typeof p==='string'&&p);e.textContent=p||'';});
+  try{const v=full||!B.last?await N.rest('board',{orderBy:'t',limitToLast:200}):await N.rest('board',{orderBy:'t',startAt:B.last+1,limitToFirst:60});
+    if(full)B.list=[];for(const [id,c] of Object.entries(v||{})){if(!c||typeof c.m!=='string')continue;const i=B.list.findIndex(x=>x.id===id);if(i>=0)B.list[i]=Object.assign({id},c);else B.list.push(Object.assign({id},c));if(c.t>B.last)B.last=c.t;}
+    B.list.sort((a,b)=>a.t-b.t);B.list=B.list.slice(-300);}catch(e){}
+  const box=$('posts'),atEnd=box.scrollTop+box.clientHeight>=box.scrollHeight-30;
+  box.innerHTML=B.list.length?B.list.map(c=>{const bad=FT.BOARD_BAD&&(FT.BOARD_BAD(c.m)||FT.BOARD_BAD(c.n)),hid=(c.r|0)>=3||bad;
+    return `<div class="bd${hid?' hid':''}"><div class="bh"><b>${esc(N.cleanName(c.n)||'名無し')}</b><span>第${c.f|0}層</span><span>${tm(c.t)}</span><span>${LG[c.l]||''}</span>${(c.r|0)?`<span class="ng">通報${c.r|0}</span>`:''}${hid?'<span class="ng">みんなには見えていない</span>':''}<span class="small">${esc(String(c.u||'').slice(0,6))}</span><button data-id="${esc(c.id)}">消す</button></div><div>${esc(c.m)}</div></div>`;}).join(''):'<div class="bd small">まだ書きこみはありません</div>';
+  box.querySelectorAll('[data-id]').forEach(b=>b.onclick=async()=>{if(!confirm('この書きこみを消しますか？'))return;await N.boardDel('all',b.dataset.id);B.list=B.list.filter(x=>x.id!==b.dataset.id);posts();});
+  if(atEnd||full)box.scrollTop=box.scrollHeight;
+}
+$('bdRe').onclick=()=>posts(true);
+B.timer=setInterval(()=>{if($('bdAuto').checked&&!document.hidden&&!$('main').hidden)posts();},12000);
+async function nbook(){
+  const [op,idx,gr]=await Promise.all([N.rest('open').catch(()=>null),N.snapIndex().catch(()=>null),N.grads().catch(()=>null)]);
+  const ok=(idx&&idx.ok)||{};let h='<table><tr><th>層</th><th>名前（書いた名前／自動の名前）</th><th>X</th><th>時刻</th><th></th></tr>';
+  for(let f=1;f<=100;f++){const o=ok[f]||(op||{})[f];if(!o)continue;h+=`<tr><td>${f}${ok[f]?'':' <span class="small">（確かめ中）</span>'}</td><td><b>${esc(o.w||'')}</b> <span class="small">${esc(o.n||'')}</span></td><td>${o.x?'@'+esc(o.x):''}</td><td>${tm(o.t)}</td><td><button class="red" data-f="${f}" data-id="${esc(o.id)}">名無しにする</button></td></tr>`;}
+  h+='</table><h3 style="font-size:15px">卒業生</h3>';
+  const L=(gr&&gr.list)||[];h+=L.length?'<table>'+L.map((g,i)=>`<tr><td>${i+1}</td><td><b>${esc(g.w||'')}</b> <span class="small">${esc(g.n||'')}</span></td><td>${g.x?'@'+esc(g.x):''}</td><td>${tm(g.t)}</td><td><button class="red" data-f="100" data-id="${esc(g.id)}">名無しにする</button></td></tr>`).join('')+'</table>':'<p class="small">まだいません</p>';
+  $('nb').innerHTML=h;
+  $('nb').querySelectorAll('[data-f]').forEach(b=>b.onclick=async()=>{if(!confirm('この名前を「名無し」にしますか？'))return;try{await N.blankName(+b.dataset.f,b.dataset.id);log(`第${b.dataset.f}層の名前を名無しにした`);nbook();}catch(e){alert('できませんでした');}});
+}
+$('bNb').onclick=nbook;
 $('bPin').onclick=async()=>{await N.boardSetPin('all',$('pin').value);log('お知らせを入れた');};
 $('bEnd').onclick=async()=>{if(!confirm('ゲームを終えますか？（元にもどせません）'))return;if(!confirm('本当に終えますか？'))return;await N.setEnd();log('ゲームを終えた');status();};
 })();

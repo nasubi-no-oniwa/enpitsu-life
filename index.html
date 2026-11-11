@@ -80,6 +80,19 @@ body.dark #hFloor{color:#f4f1de;text-shadow:0 0 4px #000,0 0 2px #000}
 .pname b{display:inline-block;padding:4px 12px;border:2px dashed var(--ink);border-radius:10px;font-size:20px;background:#fff8d8}
 textarea{width:100%;font:inherit;font-size:16px;padding:9px 10px;border:2.5px solid var(--ink);border-radius:10px;background:#fff;resize:vertical;touch-action:auto;user-select:text;-webkit-user-select:text}
 input[type=text]{width:100%;font:inherit;font-size:16px;padding:9px 10px;border:2.5px solid var(--ink);border-radius:10px;background:#fff}
+.nbook{position:relative;background-color:#fffdf7;background-image:linear-gradient(90deg,transparent 38px,rgba(224,72,62,.45) 38px,rgba(224,72,62,.45) 40px,transparent 40px),linear-gradient(transparent 33px,var(--line) 33px,var(--line) 34px);background-size:100% 100%,100% 34px;background-position:0 0,0 4px}
+.nbHead{display:flex;align-items:center;gap:8px;margin:4px 0 6px}
+.nbHead b{flex:1;text-align:center;font-size:16px;line-height:1.25}
+.nbHead b small{display:block;font-size:12px;font-weight:500;opacity:.8}
+.nbHead button{width:44px;height:40px;border:2.5px solid var(--ink);border-radius:10px;background:#fff;font-weight:900;box-shadow:2px 2px 0 var(--ink)}
+.nbHead button:disabled{opacity:.3}
+#nbList{max-height:56vh;overflow:auto;touch-action:pan-y}
+.nbr{display:flex;align-items:baseline;gap:8px;min-height:34px;line-height:34px;padding-left:46px;position:relative}
+.nbr i{position:absolute;left:0;width:40px;text-align:right;font-style:normal;font-size:12px;opacity:.7}
+.nbr b{font-family:'Yomogi',cursive;font-size:21px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:56%}
+.nbr span{font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nbr em{margin-left:auto;font-style:normal;font-size:11px;opacity:.6;white-space:nowrap}
+.nbr.none b{opacity:.35}.nbr.front b{color:var(--red);opacity:1;font-size:17px}
 #flList{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0}
 #flList button{aspect-ratio:1;border:2px solid var(--ink);border-radius:10px;background:#fff;font-weight:900;font-size:15px;padding:0}
 #flList button.top{background:var(--yellow)}
@@ -141,8 +154,8 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <div id="liveBox"></div>
  <button class="btn main" id="bPlay" data-t="最前線へ">最前線へ</button>
  <div class="row"><button class="btn" id="bFloors" data-t="層をえらぶ">層をえらぶ</button><button class="btn" id="bBoard" data-t="掲示板">掲示板</button></div>
+ <div class="row"><button class="btn sub" id="bNote" data-t="一番乗りノート">一番乗りノート</button><button class="btn sub" id="bAsk" data-t="管理人への相談">管理人への相談</button></div>
  <div class="row"><button class="btn sub" id="bHow" data-t="あそびかた">あそびかた</button><button class="btn sub" id="bSnd">♪</button></div>
- <button class="btn sub" id="bAsk" data-t="管理人への相談">管理人への相談</button>
  <div class="langs" id="langs"></div>
  <div class="foot"><span data-t="死は、だれかの足場になる。">死は、だれかの足場になる。</span><br><a href="https://nasubi-no-oniwa.github.io/" target="_blank" rel="noopener">なすびのお庭</a> ・ #エンピツライフ</div>
 </div></div>
@@ -168,9 +181,10 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <h2 id="cTitle"></h2>
  <p class="why" id="cWhy"></p>
  <div id="cFirst" hidden>
-  <p data-t="一番乗りの碑に、名前が刻まれます。XのIDを入れると、名前のとなりに出ます（入れなくてもよい）。">一番乗りの碑に、名前が刻まれます。XのIDを入れると、名前のとなりに出ます（入れなくてもよい）。</p>
-  <input type="text" id="cXid" placeholder="@xxxx" maxlength="16" autocomplete="off">
-  <button class="btn sub" id="cXSave" data-t="IDを刻む">IDを刻む</button>
+  <p id="cFirstText"></p>
+  <input type="text" id="cName" maxlength="12" autocomplete="off">
+  <input type="text" id="cXid" placeholder="@xxxx" maxlength="16" autocomplete="off" style="margin-top:6px">
+  <button class="btn sub" id="cXSave" data-t="ノートに書く">ノートに書く</button>
  </div>
  <button class="btn main" id="cNext" data-t="次の層へ">次の層へ</button>
  <div class="row"><button class="btn sub" id="cX" data-t="Xに投稿">Xに投稿</button><button class="btn sub" id="cTitleBtn" data-t="タイトル">タイトル</button></div>
@@ -222,6 +236,15 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <button class="btn sub" id="stClose" data-t="とじる">とじる</button>
 </div></div></div>
 
+<!-- 一番乗りノート -->
+<div class="ov" id="oNote"><div class="note"><div class="card nbook">
+ <h2 data-t="一番乗りノート">一番乗りノート</h2>
+ <div class="nbHead"><button id="nbPrev" aria-label="prev">◀</button><b id="nbTitle"></b><button id="nbNext" aria-label="next">▶</button></div>
+ <div id="nbList"></div>
+ <p class="small" id="nbFoot"></p>
+ <button class="btn sub" id="nbClose" data-t="とじる">とじる</button>
+</div></div></div>
+
 <!-- 管理人への相談 -->
 <div class="ov" id="oAsk"><div class="note"><div class="card">
  <h2 data-t="管理人への相談">管理人への相談</h2>
@@ -243,13 +266,13 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <button class="btn sub" id="vClose" data-t="とじる">とじる</button>
 </div></div></div>
 
-<script src="js/i18n.js?v=3"></script>
-<script src="js/config.js?v=3"></script>
-<script src="js/engine.js?v=3"></script>
-<script src="js/verify.js?v=3"></script>
-<script src="js/net.js?v=3"></script>
-<script src="js/sound.js?v=3"></script>
-<script src="js/filter.js?v=3"></script>
-<script src="js/main.js?v=3"></script>
+<script src="js/i18n.js?v=4"></script>
+<script src="js/config.js?v=4"></script>
+<script src="js/engine.js?v=4"></script>
+<script src="js/verify.js?v=4"></script>
+<script src="js/net.js?v=4"></script>
+<script src="js/sound.js?v=4"></script>
+<script src="js/filter.js?v=4"></script>
+<script src="js/main.js?v=4"></script>
 </body>
 </html>

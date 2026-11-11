@@ -48,6 +48,13 @@ el.ask = {
     $other: { '.validate': false },
   },
 };
+// 一番乗りノート：その層を越えた本人が、15分以内に1回だけ名前（w）を書ける。管理人は「名無し」にできる
+const W_RULE = `(${OPEN} && auth != null && !data.exists() && newData.exists() && data.parent().child('u').val() === auth.uid && now - data.parent().child('t').val() < 900000) || (${ADMIN} && data.parent().exists() && newData.exists())`;
+const W_VAL = "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12";
+el.open.$f.w = { '.write': W_RULE, '.validate': W_VAL };
+el.clear.$f.$id.w = { '.write': W_RULE, '.validate': W_VAL };
+// 卒業生（第100層を越えた人）の名前を管理人が消した印（まとめ作りがノートに反映する）
+el.gb = { '.read': true, $id: { '.write': ADMIN, '.validate': "$id.matches(/^[A-Za-z0-9_-]{8,30}$/) && newData.val() === true" } };
 // 管理人が見た印（詰みの知らせを読んだ）
 el.repok = { '.read': ADMIN, $f: { '.write': ADMIN, '.validate': 'newData.isNumber()' } };
 const out = JSON.stringify(el, null, 2);

@@ -7,7 +7,7 @@
 //   drec/{層}/{番号}   : { r：操作の記録, c：始まりの鉛筆, k：死ぬまでの時間 }   再生用（重いので要る分だけ読む）
 //   stat/{層}          : { d：死んだ数, c：越えた数, m：一番先まで行った割合（0〜1000） }
 //   clear/{層}/{番号}  : { n：名前, x：XのID, t, r, c, k, u, s, b }   越えた記録
-//   open/{層}          : { t, n, x, id, u }   その層をはじめて越えた（次の層が開いた）
+//   open/{層}          : { t, n, x, id, u, w：本人が書いた名前 }   その層をはじめて越えた（次の層が開いた）。一番乗りノートに載る
 //   end                : { t, w }   ゲームの終わり（管理人が入れる。入ると書きこめなくなる）
 //   u/{匿名ID}          : { c：最後に死んだ時刻, k：最後に越えた時刻, p：最後に書いた時刻, r：最後の詰みの知らせ, w/{層} }
 //   rm/{層}・reset/{層} : { t }   管理人が鉛筆を取り除いた・層を消した時刻
@@ -275,6 +275,24 @@
     }
     throw new Error('混みあっています');
   };
+  // 一番乗りノートに名前（w）とXのID（x）を書く。opened：その層をはじめて越えた（open にも書く）
+  N.setFirst = async function (f, id, w, x, opened) {
+    w = N.cleanName(w); x = N.cleanX(x);
+    const jobs = [];
+    if (w) jobs.push(update({ ['clear/' + f + '/' + id + '/w']: w }));
+    if (x) jobs.push(update({ ['clear/' + f + '/' + id + '/x']: x }));
+    if (opened && w) jobs.push(update({ ['open/' + f + '/w']: w }));
+    if (opened && x) jobs.push(update({ ['open/' + f + '/x']: x }));
+    if (!jobs.length) return { ok: 0 };
+    const r = await Promise.allSettled(jobs), ok = r.filter(v => v.status === 'fulfilled').length;
+    if (!ok) throw r[0].reason;
+    return { ok, all: ok === jobs.length };
+  };
+  // 卒業生（第100層を越えた人。まとめ作りが15分ごとに確かめて作る）
+  N.grads = async function () {
+    try { const r = await Promise.race([fetch(N.SNAP + 'grads.json?t=' + Math.floor(Date.now() / 300000), { cache: 'no-cache' }), late(10000)]); if (r.ok) return await r.json(); } catch (e) { }
+    return null;
+  };
   N.setXid = async function (f, id, xid, open) {
     const jobs = [update({ ['clear/' + f + '/' + id + '/x']: xid })];
     if (open) jobs.push(update({ ['open/' + f + '/x']: xid }));
@@ -304,7 +322,6 @@
     return { wait: true };
   };
   // 卒業の碑（第100層を越えた人）
-  N.summit = async function () { const v = await rest('clear/100', { orderBy: 't', limitToFirst: 300 }).catch(() => null); return Object.values(v || {}).filter(c => c && c.n).sort((a, b) => a.t - b.t).map(c => ({ n: N.cleanName(c.n) || '名無し', x: N.cleanX(c.x), t: c.t })); };
   // =============================================
   //  詰みの知らせ（自動で走らせた判定つき）
   // =============================================
@@ -392,9 +409,10 @@
     if (Object.keys(w).length) await update(w);
   };
   N.blankName = async function (f, id) {
-    const w = {}; if (id) w['clear/' + f + '/' + id + '/n'] = '名無し';
-    const op = await rest('open/' + f).catch(() => null); if (op && (!id || op.id === id)) { w['open/' + f + '/n'] = '名無し'; w['open/' + f + '/x'] = ''; }
+    const w = {}; if (id) { w['clear/' + f + '/' + id + '/n'] = '名無し'; w['clear/' + f + '/' + id + '/w'] = '名無し'; }
+    const op = await rest('open/' + f).catch(() => null); if (op && (!id || op.id === id)) { w['open/' + f + '/n'] = '名無し'; w['open/' + f + '/w'] = '名無し'; w['open/' + f + '/x'] = ''; }
     if (id) w['clear/' + f + '/' + id + '/x'] = '';
+    if (id && +f === 100) w['gb/' + id] = true;
     if (Object.keys(w).length) await update(w);
   };
 })(typeof window !== 'undefined' ? window : globalThis);

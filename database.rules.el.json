@@ -188,6 +188,10 @@
         },
         "$other": {
           ".validate": false
+        },
+        "w": {
+          ".write": "(!root.child('el/end').exists() && auth != null && !data.exists() && newData.exists() && data.parent().child('u').val() === auth.uid && now - data.parent().child('t').val() < 900000) || ((auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val()) && data.parent().exists() && newData.exists())",
+          ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12"
         }
       }
     }
@@ -216,6 +220,10 @@
       },
       "$other": {
         ".validate": false
+      },
+      "w": {
+        ".write": "(!root.child('el/end').exists() && auth != null && !data.exists() && newData.exists() && data.parent().child('u').val() === auth.uid && now - data.parent().child('t').val() < 900000) || ((auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val()) && data.parent().exists() && newData.exists())",
+        ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 12"
       }
     }
   },
@@ -388,6 +396,13 @@
       "$other": {
         ".validate": false
       }
+    }
+  },
+  "gb": {
+    ".read": true,
+    "$id": {
+      ".write": "(auth != null && root.child('ft_admin/key').exists() && root.child('ft_admins/' + auth.uid).val() === root.child('ft_admin/key').val())",
+      ".validate": "$id.matches(/^[A-Za-z0-9_-]{8,30}$/) && newData.val() === true"
     }
   },
   "repok": {

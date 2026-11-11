@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '3';
+  FT.VER = '4';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -29,6 +29,9 @@
   // ---------- 全体の状態 ----------
   const W = { open: {}, okSnap: {}, ckpt: null, okLocal: N.store('el_okf') || {}, stat: {}, latest: 1, end: null, rawTop: 1, dead: 0 };
   const okFloor = f => !!(W.okSnap[f] || (W.ckpt !== null && f <= W.ckpt) || (W.okLocal[f] && W.open[f] && W.okLocal[f] === W.open[f].t) || (OFFLINE && W.okLocal[f]));
+  // その層の一番乗り（まとめで確かめた記録を先に、なければ確かめた「開いた」印）。名前は本人が書いた名前（w）を先に
+  const firstOf = f => W.okSnap[f] || (okFloor(f) && W.open[f]) || null;
+  const nameOf = o => N.cleanName((o && (o.w || o.n)) || '') || T('名無し');
   function computeLatest() { let L = 1; while (L <= 100 && okFloor(L)) L++; W.done = L > 100; W.latest = Math.min(100, L); }
   async function refreshWorld() {
     if (OFFLINE) { computeLatest(); return; }
@@ -183,11 +186,16 @@
     try {
       const res = await N.clear(lv, { name: S.name, rec: S.rec.str(), cor: S.start, ticks: r.t });
       S.clearInfo.id = res.id; S.clearInfo.opened = res.opened;
-      if (res.opened) { $('cFirst').hidden = false; $('cWhy').textContent = T('一番乗り！ 第{0}層が、みんなに開いた。', lv.f + 1); W.open[lv.f] = { t: Date.now(), n: S.name, x: '', id: res.id }; }
+      if (res.opened) { $('cWhy').textContent = lv.f >= 100 ? T('一番乗りで卒業！') : T('一番乗り！ 第{0}層が、みんなに開いた。', lv.f + 1); W.open[lv.f] = { t: Date.now(), n: S.name, x: '', id: res.id }; }
+      if (res.id && (res.opened || lv.f >= 100)) {
+        $('cFirstText').textContent = (res.opened ? T('一番乗りノートに名前が載ります。') : T('卒業生として、一番乗りノートの最後のページに名前が載ります。')) + T('好きな名前を書けます（12文字まで・15分以内に1回だけ）。書かなければ「{0}」で載ります。XのIDを入れると、名前のとなりに出ます（入れなくてもよい）。', S.name);
+        $('cName').value = ''; $('cName').placeholder = S.name; $('cXid').value = ME.xid ? '@' + ME.xid : '';
+        S.clearInfo.at = Date.now(); $('cFirst').hidden = false;
+      }
       W.okLocal[lv.f] = (W.open[lv.f] && W.open[lv.f].t) || Date.now();
       // 自分で越えた層は、すぐ確かめて開く（越えた記録を再生）
       const okNow = await N.verifyClearAsync(lv, { t: 1, r: S.rec.str(), c: S.start, k: r.t }, N.present(lv)).catch(() => false);
-      if (okNow) { const op = await N.rest('open/' + lv.f).catch(() => null); if (op) { W.open[lv.f] = op; W.okLocal[lv.f] = op.t; } N.store('el_okf', W.okLocal); }
+      if (okNow) { const op = await N.rest('open/' + lv.f).catch(() => null); if (op) { const keep = W.open[lv.f]; W.open[lv.f] = Object.assign(op, keep && keep.id === op.id && keep.w ? { w: keep.w } : {}); W.okLocal[lv.f] = op.t; } N.store('el_okf', W.okLocal); }
       computeLatest();
     } catch (e) { toast(T('記録を送れませんでした'), T('少したってから、もう一度')); }
   }
@@ -470,6 +478,12 @@
     g.fillStyle = '#e0483e'; g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx + s * .9, fy + s * .25 + Math.sin(t * 4) * s * .05); g.lineTo(fx, fy + s * .5); g.closePath(); g.fill(); g.stroke();
     g.fillStyle = 'rgba(245,200,76,.25)'; g.fillRect(X(gx), Y(gy), gw * s, gh * s);
     g.fillStyle = ink; g.font = `900 ${Math.max(11, s * .36)}px 'Zen Maru Gothic',sans-serif`; g.textAlign = 'center'; g.fillText(T('ゴール'), X(gx + gw / 2), Y(gy) - s * .1);
+    // 一番乗りの名前
+    if (!S.pv) {
+      const o = firstOf(lv.f), txt = o ? T('一番乗り：{0}', nameOf(o)) : T('一番乗りは、まだいない');
+      g.font = `400 ${Math.max(11, s * .32)}px 'Yomogi','Zen Maru Gothic',sans-serif`; g.lineWidth = Math.max(2, s * .1); g.strokeStyle = 'rgba(255,255,255,.85)';
+      g.strokeText(txt, X(gx + gw / 2), Y(gy) - s * .8); g.fillStyle = o ? '#e0483e' : ink; g.fillText(txt, X(gx + gw / 2), Y(gy) - s * .8);
+    }
   }
   function drawEnts(g, X, Y, s, lv, r, t, ink) {
     const sTime = r ? r.t * FT.DT : t;
@@ -551,9 +565,21 @@
   $('cTitleBtn').onclick = () => toTitle();
   $('cX').onclick = () => shareX(clearText());
   $('cXSave').onclick = async () => {
-    const x = N.cleanX($('cXid').value); if (!x) { toast(T('XのIDの形ではありません')); return; }
     const ci = S.clearInfo; if (!ci || !ci.id) return;
-    try { await N.setXid(ci.f, ci.id, x, ci.opened); ME.xid = x; saveMe(); toast(T('碑に刻みました')); $('cFirst').hidden = true; } catch (e) { toast(T('刻めませんでした'), T('15分以内なら、もう一度ためせます')); }
+    const wr = $('cName').value.trim(), w = N.cleanName(wr), xr = $('cXid').value.trim(), x = xr ? N.cleanX(xr) : '';
+    if (wr && !w) { toast(T('その名前は使えません')); return; }
+    if (xr && !x) { toast(T('XのIDの形ではありません')); return; }
+    if (!w && !x) { toast(T('名前かXのIDを入れてください')); return; }
+    if (Date.now() - (ci.at || 0) > 15 * 60000) { toast(T('書けるのは、越えてから15分のあいだだけです')); return; }
+    $('cXSave').disabled = true;
+    try {
+      const r = await N.setFirst(ci.f, ci.id, w, x, ci.opened);
+      if (x) { ME.xid = x; saveMe(); }
+      if (ci.opened && W.open[ci.f] && W.open[ci.f].id === ci.id) { if (w) W.open[ci.f].w = w; if (x) W.open[ci.f].x = x; }
+      toast(T('ノートに書きました'), r.all ? '' : T('一部は書けませんでした（書けるのは1回だけです）'));
+      $('cFirst').hidden = true;
+    } catch (e) { toast(T('書けませんでした'), T('書けるのは1回だけ・15分以内です')); }
+    $('cXSave').disabled = false;
   };
   // ---------- 層をえらぶ ----------
   function openFloors() {
@@ -565,11 +591,45 @@
       b.onmouseenter = b.onfocus = () => info(f);
       box.appendChild(b);
     }
-    const info = f => { const o = W.open[f] || (W.okSnap[f]); $('flInfo').textContent = T('第{0}層 {1}', f, T(LEVELS[f - 1].n)) + (o && o.n ? ' ・ ' + T('一番乗り：{0}', o.n + (o.x ? ' @' + o.x : '')) : ''); };
+    const info = f => { const o = firstOf(f); $('flInfo').textContent = T('第{0}層 {1}', f, T(LEVELS[f - 1].n)) + (o ? ' ・ ' + T('一番乗り：{0}', nameOf(o) + (o.x ? ' @' + o.x : '')) : ''); };
     info(W.latest);
     ov('oFloors', 1);
   }
   $('flClose').onclick = () => ov('oFloors', 0);
+  // ---------- 一番乗りノート（1ページ10層・最後のページは卒業生） ----------
+  const NB = { page: 0, grads: null };
+  const when = t => t ? new Date(t).toLocaleString(FT.LOCALE, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  async function openNote() {
+    if (!LEVELS) return;
+    NB.page = Math.min(9, Math.floor((Math.min(100, W.latest) - 1) / 10)); paintNote(); ov('oNote', 1);
+    if (!OFFLINE) { refreshWorld().then(paintNote).catch(() => { }); N.grads().then(g => { NB.grads = g; paintNote(); }).catch(() => { }); }
+  }
+  function paintNote() {
+    const p = NB.page, box = $('nbList'); box.innerHTML = '';
+    $('nbPrev').disabled = p <= 0; $('nbNext').disabled = p >= 10;
+    if (p < 10) {
+      $('nbTitle').innerHTML = esc(T('第{0}〜{1}層', p * 10 + 1, p * 10 + 10)) + '<small>' + esc(T(LEVELS[p * 10].n)) + '</small>';
+      for (let f = p * 10 + 1; f <= p * 10 + 10; f++) {
+        const o = firstOf(f), d = document.createElement('div');
+        if (o) { d.className = 'nbr'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>${esc(nameOf(o))}</b><span>${o.x ? '@' + esc(o.x) : ''}</span><em>${esc(when(o.t))}</em>`; }
+        else if (f === W.latest && !W.done) { d.className = 'nbr front'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>${esc(T('いまの最前線'))}</b>`; }
+        else { d.className = 'nbr none'; d.innerHTML = `<i>${esc(T('第{0}層', f))}</i><b>……</b>`; }
+        box.appendChild(d);
+      }
+      $('nbFoot').textContent = T('その層をはじめて越えた人の名前が、ここに書かれる。');
+    } else {
+      $('nbTitle').innerHTML = esc(T('卒業生')) + '<small>' + esc(T('第100層を越えた人')) + '</small>';
+      const list = (NB.grads && NB.grads.list) || [];
+      if (!list.length) { const d = document.createElement('div'); d.className = 'nbr none'; d.innerHTML = `<i></i><b>${esc(T('まだだれも卒業していない'))}</b>`; box.appendChild(d); }
+      list.forEach((o, i) => { const d = document.createElement('div'); d.className = 'nbr'; d.innerHTML = `<i>${i + 1}</i><b>${esc(nameOf(o))}</b><span>${o.x ? '@' + esc(o.x) : ''}</span><em>${esc(when(o.t))}</em>`; box.appendChild(d); });
+      $('nbFoot').textContent = T('卒業生は15分ごとに書き足されます。');
+    }
+    box.scrollTop = 0;
+  }
+  $('bNote').onclick = () => openNote();
+  $('nbPrev').onclick = () => { NB.page = Math.max(0, NB.page - 1); paintNote(); };
+  $('nbNext').onclick = () => { NB.page = Math.min(10, NB.page + 1); paintNote(); };
+  $('nbClose').onclick = () => ov('oNote', 0);
   // ---------- あそびかた ----------
   function openHow() {
     const L = ['指を置いて引っぱり、はなすと鉛筆が飛ぶ。引いた向きの反対へ、引いた長さの強さで飛ぶ（真上から左右60度まで）。',

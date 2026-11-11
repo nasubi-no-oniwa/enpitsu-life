@@ -62,6 +62,15 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   ok(cl && cl.id && cl.opened, '越えた記録と、開いた印を書けた ' + JSON.stringify(cl));
   const op = await get('el/open/1'); ok(op && op.id === cl.id, '開いた印が入った');
   await NA.setXid(1, cl.id, 'nasubi', true).then(() => ok(true, 'XのIDを刻めた')).catch(e => ok(false, 'XのIDを刻めない ' + e.message));
+  await NB.setFirst(1, cl.id, 'よこどり', '', true).then(() => ok(false, 'ほかの人が一番乗りの名前を書けてしまった')).catch(() => ok(true, 'ほかの人は一番乗りの名前を書けない'));
+  await NA.setFirst(1, cl.id, 'なすび', '', true).then(r => ok(r.all, '一番乗りの名前をノートに書けた')).catch(e => ok(false, '名前を書けない ' + e.message));
+  const op2 = await get('el/open/1'), cl2 = await get('el/clear/1/' + cl.id);
+  ok(op2.w === 'なすび' && cl2.w === 'なすび', '開いた印と越えた記録の両方に名前が入った');
+  await NA.setFirst(1, cl.id, 'かきなおし', '', true).then(() => ok(false, '名前を2回書けてしまった')).catch(() => ok(true, '名前を書けるのは1回だけ'));
+  { const dir = fs.mkdtempSync('/tmp/elsnap'); const out = cp.spawnSync(process.execPath, [path.join(ROOT, 'tools/snapshot.js')], { env: Object.assign({}, process.env, { EL_CONFIG_JSON: JSON.stringify({ apiKey: 'test', databaseURL: `http://127.0.0.1:${PORT}`, ns: 'g' }), EL_SNAP_DIR: dir, EL_SNAP_MS: '20000' }), encoding: 'utf8' });
+    const ix = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8')), gr = JSON.parse(fs.readFileSync(path.join(dir, 'grads.json'), 'utf8'));
+    ok(out.status === 0 && ix.open[1] && ix.open[1].w === 'なすび', 'まとめに一番乗りの名前が入る');
+    ok(Array.isArray(gr.list), 'まとめに卒業生の一覧ができる'); }
   const fc = await NB.firstClear(lvB); ok(fc === null, 'にせの越えた記録は、確かめで通らない');
   console.log('4) 掲示板・詰みの知らせ・ほかの人は管理できない');
   await NB.boardPost('all', { n: 'びーさん', m: 'がんばろう', l: 'ja', f: 1 }).then(() => ok(true, '掲示板に書けた')).catch(e => ok(false, '掲示板に書けない ' + e.message));
@@ -85,6 +94,8 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   const lv = await NB.live(); ok(lv.length === 1, 'みんなが配信中を読める');
   await NA.boardSetPin('all', 'お知らせです').then(() => ok(true, 'お知らせを書けた')).catch(e => ok(false, 'お知らせを書けない ' + e.message));
   await NA.resetFloor(2).then(() => ok(true, '管理人は層の記録を全部消せる')).catch(e => ok(false, '層の記録を消せない ' + e.message));
+  await NA.blankName(1, cl.id).then(() => ok(true, '管理人は一番乗りの名前を名無しにできる')).catch(e => ok(false, '名無しにできない ' + e.message));
+  const op3 = await get('el/open/1'); ok(op3.w === '名無し' && op3.n === '名無し' && op3.x === '', '名無しになった');
   const g = await NA.dlog(1); ok(g.length === 1 && g[0].n === 3, '鉛筆を置いた人の一覧');
   await NA.removeBy(1, g[0]).then(() => ok(true, 'その人の鉛筆を取り除けた')).catch(e => ok(false, '取り除けない ' + e.message));
   await NA.setEnd().then(() => ok(true, 'ゲームを終えられた')).catch(e => ok(false, '終えられない ' + e.message));
