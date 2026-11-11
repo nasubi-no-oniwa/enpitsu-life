@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '7';
+  FT.VER = '8';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -13,6 +13,7 @@
   const OFFLINE = /[?&]offline=1/.test(location.search) || !N.ready();
   // ---------- 自分のこと（この端末だけ） ----------
   const ME = Object.assign({ dead: 0, best: 1, how: 0, xid: '', bname: '', bpost: 0, bhide: [], seen: 0 }, N.store('el_me') || {});
+  if (!ME.bp || typeof ME.bp !== 'object') ME.bp = {};   // 層ごとの、自分がいちばん先まで行った割合（0〜1000）
   const saveMe = () => N.store('el_me', ME);
   // ---------- 鉛筆の名前 ----------
   const NAMES = {
@@ -57,7 +58,7 @@
   // =============================================
   //  画面の切りかえ
   // =============================================
-  const scr = id => { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id); $('hud').classList.toggle('on', id === 'game'); };
+  const scr = id => { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id); $('hud').classList.toggle('on', id === 'game'); $('hFront').classList.toggle('on', id === 'game'); };
   const ov = (id, on) => $(id).classList.toggle('on', !!on);
   const anyOv = () => !!document.querySelector('.ov.on');
   let toastT = 0;
@@ -68,6 +69,9 @@
   // =============================================
   function paintTitle() {
     $('tTop').textContent = W.done ? T('全100層 卒業') : T('第{0}層', W.latest);
+    { const L = W.latest, ln = LEVELS && LEVELS[L - 1] ? T(LEVELS[L - 1].n) : '', fr = W.done ? 1000 : frontOf(L);
+      $('tFrT').textContent = W.done ? T('全100層 卒業') : T('最前線 第{0}層', L); void ln;
+      setBar('tFr', fr, W.done || ME.bp[L] === undefined ? -1 : ME.bp[L] | 0, T('先頭 {0}%', Math.floor(fr / 10))); }
     $('tDead').textContent = T('{0}本', fmt(W.dead));
     $('tMine').textContent = T('{0}本', fmt(ME.dead));
     $('tNote').textContent = OFFLINE ? T('いまは一人で遊んでいます（みんなの鉛筆は出ません）') : (W.end ? T('ゲームは終わりました。鉛筆はもう増えません') : T('鉛筆は20秒ごとに、みんなのものが届きます'));
@@ -126,8 +130,23 @@
   function hud() {
     const lv = S.lv; if (!lv) return;
     const st = W.stat[lv.f] || {};
-    const prog = S.run ? Math.max(0, Math.min(100, Math.round((S.run.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 100))) : 0;
-    $('hFloor').innerHTML = `${esc(T('第{0}層', lv.f))} ${esc(T(lv.name))}<small>${esc(T('この層の鉛筆 {0}本', fmt(Math.max(st.d || 0, countPencils()))))} ・ ${esc(T('ここまで {0}%', prog))}</small>`;
+    const prog = Math.floor(progOf(S.run, lv) / 10);
+    $('hFloor').innerHTML = `${esc(T('第{0}層', lv.f))} ${esc(T(lv.name))}<small>${esc(T('この層の鉛筆 {0}本', fmt(Math.max(st.d || 0, countPencils()))))} ・ ${esc(T('自分 {0}%', prog))}</small>`;
+    paintFront();
+  }
+  // ---------- 先頭のバー（シインクラッドと同じ。みんなの中でいちばん先まで行った所を塗り、▼が自分） ----------
+  const progOf = (r, lv) => r && lv ? Math.max(0, Math.min(1000, Math.round((r.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 1000))) : 0;
+  const frontOf = f => okFloor(f) ? 1000 : Math.max(0, Math.min(1000, (W.stat[f] && W.stat[f].m) | 0, 1000), ME.bp[f] | 0);
+  function setBar(pre, front, me, label) {
+    $(pre + 'I').style.width = (front / 10) + '%';
+    const u = $(pre + 'U'); if (me >= 0) { u.style.display = 'block'; u.style.left = (me / 10) + '%'; } else u.style.display = 'none';
+    $(pre + 'P').textContent = label;
+  }
+  let frontAt = 0;
+  function paintFront() {
+    const lv = S.lv; if (!lv) return; frontAt = Date.now();
+    const me = progOf(S.run, lv), front = Math.max(frontOf(lv.f), me);
+    setBar('hFr', front, me, Math.floor(front / 10) + '%');
   }
   const countPencils = () => { let n = 0; for (const c of S.cor.values()) n += c.n | 0; return n; };
   let hintT = 0;
@@ -139,6 +158,7 @@
     const pl = r.place || { k: -1, why: 'out' };
     ME.dead++; saveMe();
     const m = Math.max(0, Math.min(1000, Math.round((r.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 1000)));
+    if (m > (ME.bp[lv.f] | 0)) { ME.bp[lv.f] = m; saveMe(); }
     let count = (W.stat[lv.f] && W.stat[lv.f].d) || 0; count = Math.max(count, countPencils()) + 1;
     if (pl.k >= 0) {
       const c = { n: pl.n, name: S.name, t: Date.now() };
@@ -173,6 +193,7 @@
   async function onClear() {
     const lv = S.lv, r = S.run;
     S.mode = 'clear'; SND.se('clear'); fxClear(); if (S.pvEv) S.pvEv.push('clear');
+    if (S.lv) { ME.bp[S.lv.f] = 1000; saveMe(); }
     ME.how = Math.max(ME.how, 2);
     if (lv.f + 1 > ME.best) ME.best = Math.min(101, lv.f + 1);
     saveMe();
@@ -206,6 +227,7 @@
   async function sync() {
     if (OFFLINE || !S.lv || S.loading) return;
     S.syncAt = Date.now();
+    { const f = S.lv.f; N.floorStat(f).then(v => { if (v && typeof v === 'object') { const o = W.stat[f] || {}; W.stat[f] = Object.assign({}, o, v, { d: Math.max(v.d | 0, o.d | 0), m: Math.max(v.m | 0, o.m | 0) }); if (S.lv && S.lv.f === f) hud(); } }).catch(() => { }); }
     try {
       const m = await N.syncCells(S.lv, S.mine);
       const before = countPencils();
@@ -310,7 +332,7 @@
       while (S.acc >= FT.DT) { S.acc -= FT.DT; tick(); if (S.mode !== 'play') break; }
       if (Date.now() - S.syncAt > 20000) sync();
     }
-    if (S.lv && (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear')) { camera(dt); draw(cx, VW, VH, dpr, S.cam, now / 1000); }
+    if (S.lv && (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear')) { camera(dt); draw(cx, VW, VH, dpr, S.cam, now / 1000); if (Date.now() - frontAt > 250) paintFront(); }
     else drawTitleBg(now / 1000);
   }
   // ---------- カメラ ----------
@@ -800,5 +822,5 @@
   fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; return refreshWorld(); }).then(() => { paintTitle(); loadLive(true); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
   if (!OFFLINE) N.warm();
   // 管理画面などから使う
-  FT.APP = { S, W, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper };
+  FT.APP = { S, W, ME, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper, paintTitle, hud };
 })(window);

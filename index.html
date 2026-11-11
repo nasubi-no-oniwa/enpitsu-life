@@ -55,8 +55,20 @@ button{font:inherit;color:inherit;cursor:pointer}
 .langs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px}
 .langs button{border:2px solid var(--ink);border-radius:9px;background:#fff;padding:4px 10px;font-size:13px}
 .langs button.on{background:var(--yellow);font-weight:900}
+/* 先頭のバー（みんなの中でいちばん先まで行った所。▼は自分） */
+.fbar{display:flex;align-items:center;gap:6px;font-weight:900;font-size:12px;line-height:1}
+.fbar .fl{white-space:nowrap}
+.fbar .fb{position:relative;flex:1;height:11px;border:2px solid var(--ink);border-radius:7px;background:#fffdf6}
+.fbar .fb i{position:absolute;left:0;top:0;bottom:0;width:0;background:repeating-linear-gradient(-45deg,var(--yellow) 0 6px,#f0b92f 6px 9px);border-radius:5px;transition:width .5s}
+.fbar .fb u{position:absolute;top:-9px;width:0;height:0;margin-left:-6px;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid var(--red);display:none;transition:left .25s}
+.fbar b{min-width:64px;text-align:right;white-space:nowrap}
+#tFront{position:sticky;top:0;z-index:3;padding:max(9px,env(safe-area-inset-top)) 12px 8px;background:rgba(246,241,227,.95);border-bottom:2px solid var(--ink)}
+#tFront .fbar{font-size:13px}
+#hFront{position:fixed;left:0;right:0;top:0;padding:max(9px,env(safe-area-inset-top)) 12px 0;display:none;pointer-events:none;z-index:6}
+#hFront.on{display:block}
+body.dark #hFront .fbar{color:#f4f1de;text-shadow:0 0 3px #000}
 /* 遊ぶ画面 */
-#hud{position:fixed;left:0;right:0;top:0;padding:max(8px,env(safe-area-inset-top)) 10px 0;display:none;pointer-events:none;z-index:5}
+#hud{position:fixed;left:0;right:0;top:0;padding:calc(max(9px,env(safe-area-inset-top)) + 22px) 10px 0;display:none;pointer-events:none;z-index:5}
 #hud.on{display:flex;align-items:flex-start;gap:8px}
 #hFloor{flex:1;font-weight:900;font-size:16px;text-shadow:0 0 4px var(--paper),0 0 2px var(--paper);line-height:1.25}
 #hFloor small{display:block;font-weight:500;font-size:12px}
@@ -156,7 +168,7 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
 <canvas id="c"></canvas>
 
 <!-- タイトル -->
-<div class="screen on" id="title"><div class="note">
+<div class="screen on" id="title"><div id="tFront"><div class="fbar"><span class="fl" id="tFrT">…</span><div class="fb"><i id="tFrI"></i><u id="tFrU"></u></div><b id="tFrP">…</b></div></div><div class="note">
  <div class="logo"><b data-t="エンピツライフ">エンピツライフ</b><i data-t="地面に落ちたら、その場で鉛筆になる。">地面に落ちたら、その場で鉛筆になる。</i></div>
  <div class="paper">
   <div class="stat"><span data-t="いま開いている層">いま開いている層</span><b id="tTop">…</b></div>
@@ -174,6 +186,7 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
 </div></div>
 
 <!-- 遊ぶ画面の上 -->
+<div id="hFront"><div class="fbar"><span class="fl" data-t="先頭">先頭</span><div class="fb"><i id="hFrI"></i><u id="hFrU"></u></div><b id="hFrP">…</b></div></div>
 <div id="hud"><div id="hFloor"></div><button id="hLive">●LIVE</button><button id="hMenu" aria-label="menu">≡</button></div>
 <div id="hint"></div>
 <div id="toast"></div>
@@ -279,13 +292,13 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <button class="btn sub" id="vClose" data-t="とじる">とじる</button>
 </div></div></div>
 
-<script src="js/i18n.js?v=7"></script>
-<script src="js/config.js?v=7"></script>
-<script src="js/engine.js?v=7"></script>
-<script src="js/verify.js?v=7"></script>
-<script src="js/net.js?v=7"></script>
-<script src="js/sound.js?v=7"></script>
-<script src="js/filter.js?v=7"></script>
-<script src="js/main.js?v=7"></script>
+<script src="js/i18n.js?v=8"></script>
+<script src="js/config.js?v=8"></script>
+<script src="js/engine.js?v=8"></script>
+<script src="js/verify.js?v=8"></script>
+<script src="js/net.js?v=8"></script>
+<script src="js/sound.js?v=8"></script>
+<script src="js/filter.js?v=8"></script>
+<script src="js/main.js?v=8"></script>
 </body>
 </html>
