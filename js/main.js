@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '1';
+  FT.VER = '2';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -641,6 +641,7 @@
     try { res = await N.inWorker('stuck', { lv: N.plainLv(lv), cor, opt: { ms: 25000, max: 40 } }, () => ({ ok: null, why: 'noworker' })); } catch (e) { res = { ok: null, why: 'err' }; }
     let a, msg;
     if (res && res.ok === true) { a = `越えられる（あと${res.need}本で届いた・${Math.round(res.ms / 1000)}秒）`; msg = res.need === 0 ? T('いまの鉛筆だけで、越えられる道が見つかりました。') : T('あと{0}本ほど鉛筆が増えれば、越えられそうです。', res.need); }
+    else if (res && res.ok === false && (res.why === 'max' || res.why === 'time')) { a = `まだ足りないだけ（${res.why}・${res.need}本足してもまだ届かず・いちばん先 x=${Math.round(res.far || 0)}）`; msg = T('まだ鉛筆が足りないだけのようです（{0}本以上いりそうです）。管理人にも届けます。', res.need); }
     else if (res && res.ok === false) { a = `越えられない（${res.why}・${res.need}本足しても届かず・いちばん先 x=${Math.round(res.far || 0)}）`; msg = T('この形では越えられないかもしれません。管理人が確かめます。'); }
     else { a = '自動の判定ができなかった'; msg = T('この端末では調べられませんでした。そのまま管理人に届けます。'); }
     const m = S.run ? Math.round((S.run.p.maxX - lv.start[0]) / (lv.goal[0] - lv.start[0]) * 1000) : 0;

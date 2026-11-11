@@ -361,7 +361,8 @@
   N.adminLogin = async function (key) { await N.token(false); await restWrite('PUT', 'ft_admins/' + N.uid(), String(key), true); return N.uid(); };
   N.setCkpt = f => restWrite('PUT', 'ckpt', f);
   N.setEnd = () => restWrite('PUT', 'end', { t: SV, w: 'b' });
-  N.resetFloor = f => update({ ['cells/' + f]: null, ['dlog/' + f]: null, ['drec/' + f]: null, ['rm/' + f]: { t: SV }, ['reset/' + f]: { t: SV } });
+  // 層を消す：鉛筆・越えた記録・一番乗り・数をぜんぶ（層の形を作りなおしたときなど）
+  N.resetFloor = f => update({ ['cells/' + f]: null, ['dlog/' + f]: null, ['drec/' + f]: null, ['clear/' + f]: null, ['open/' + f]: null, ['stat/' + f]: null, ['rm/' + f]: { t: SV }, ['reset/' + f]: { t: SV } });
   N.dlog = async function (f) {
     const v = await rest('dlog/' + f) || {}, by = new Map();
     for (const id in v) { const d = v[id]; if (!d || typeof d.u !== 'string') continue; const g = by.get(d.u) || { u: d.u, n: 0, first: Infinity, last: 0, ids: [], ps: [] }; g.n++; g.first = Math.min(g.first, d.t || 0); g.last = Math.max(g.last, d.t || 0); g.ids.push(id); g.ps.push(d.p); by.set(d.u, g); }

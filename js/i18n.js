@@ -79,6 +79,7 @@
     '調べています…': ['Checking…', '檢查中…', '확인하는 중…'],
     'いまの鉛筆だけで、越えられる道が見つかりました。': ['A way through was found with the current pencils.', '用現在的鉛筆就找到了能越過的路。', '지금 연필만으로 넘을 수 있는 길을 찾았어요.'],
     'あと{0}本ほど鉛筆が増えれば、越えられそうです。': ['It looks clearable with about {0} more pencils.', '大概再多{0}支鉛筆就能越過。', '연필이 {0}자루쯤 더 늘면 넘을 수 있을 것 같아요.'],
+    'まだ鉛筆が足りないだけのようです（{0}本以上いりそうです）。管理人にも届けます。': ['Looks like it just needs more pencils (about {0} or more). Sending to the admin too.', '看起來只是鉛筆還不夠（大概要{0}支以上），也會通知管理員。', '아직 연필이 부족한 것 같아요 ({0}자루 이상 필요해 보여요). 관리자에게도 보낼게요.'],
     'この形では越えられないかもしれません。管理人が確かめます。': ['It might not be clearable like this. The admin will check.', '這個狀態可能無法越過，管理員會確認。', '이 상태로는 못 넘을지도 몰라요. 관리자가 확인할게요.'],
     'この端末では調べられませんでした。そのまま管理人に届けます。': ['This device couldn\'t check it. Sending to the admin as is.', '這台裝置無法檢查，直接通知管理員。', '이 기기에서는 확인하지 못했어요. 그대로 관리자에게 보낼게요.'],
     '管理人に届けました。ありがとうございます。': ['Sent to the admin. Thank you.', '已通知管理員，謝謝。', '관리자에게 보냈어요. 고맙습니다.'],

@@ -16,7 +16,7 @@ function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>
 function build(f, tryN) {
   const R = rng(f * 7919 + tryN * 104729 + 13), ri = (a, b) => a + Math.floor(R() * (b - a + 1)), pick = a => a[Math.floor(R() * a.length)];
   const d = (f - 1) / 99;
-  const W = Math.round(46 + f * 2.1 + ri(0, 8));
+  const W = Math.round(70 + f * 3.4 + ri(0, 10));
   const tiles = new Uint8Array(W * H), cap = new Int8Array(W).fill(2), ents = [];
   const set = (x, y, v) => { if (x >= 0 && x < W && y >= 0 && y < H) tiles[y * W + x] = v; };
   const fillCol = (x, top, v) => { for (let y = top; y < H; y++) set(x, y, v); };
@@ -30,7 +30,7 @@ function build(f, tryN) {
   const goalW = 6;
   // 使える部品（層が上がると増える）
   const parts = ['flat', 'step', 'glue'];
-  if (f >= 4) parts.push('wall');
+  parts.push('wall');
   if (f >= 6) parts.push('spike');
   if (f >= 12) parts.push('ceil');
   if (f >= 15) parts.push('plane');
@@ -47,11 +47,11 @@ function build(f, tryN) {
       g = Math.max(8, Math.min(GY + 3, g + (up ? -h : h)));
       flat(ri(2, 4));
     } else if (k === 'glue' || k === 'spike') {
-      const n = ri(2 + Math.round(d * 3), 3 + Math.round(d * 8));
+      const n = ri(3 + Math.round(d * 3), 4 + Math.round(d * 8));
       for (let i = 0; i < n && x < W - goalW - 3; i++, x++) { fillCol(x, g, T.BLOCK); if (k === 'glue') set(x, g, T.GLUE); else { set(x, g - 1, T.SPIKE); } cap[x] = 0; }
       flat(ri(2, 3));
     } else if (k === 'wall') {
-      const hw = ri(5 + Math.round(d * 3), 7 + Math.round(d * 7)), th = ri(1, 2);
+      const hw = ri(6 + Math.round(d * 3), 8 + Math.round(d * 7)), th = ri(1, 2);
       // 壁の前は、積める本数を多めにする（壁の上まで届くように）
       const needN = Math.max(2, Math.ceil((hw - 3.2) / FT.PHYS.PH) + 1);
       flat(1); cap[x - 1] = needN; if (x >= 2) cap[x - 2] = Math.max(cap[x - 2], Math.ceil(needN / 2));
@@ -87,12 +87,12 @@ function build(f, tryN) {
 const from = +(process.argv[2] || 1), to = +(process.argv[3] || 100);
 const all = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : [];
 // 必要な鉛筆の数の目安（層が上がるほど多く）。少なすぎる・多すぎる層は作りなおす
-const want = f => [Math.round(3 + f * 0.45), Math.round(12 + f * 1.7)];
+const want = f => [Math.round(9 + f * 0.9), Math.round(30 + f * 3)];
 for (let f = from; f <= to; f++) {
   let best = null;
-  for (let tryN = 0; tryN < 8; tryN++) {
+  for (let tryN = 0; tryN < 5; tryN++) {
     const r = build(f, tryN), lv = FT.makeLevel(r);
-    const res = S.solve(lv, null, { max: want(f)[1] + 30, ms: 45000 });
+    const res = S.solve(lv, null, { max: want(f)[1] + 40, ms: 70000 });
     const [lo, hi] = want(f);
     const line = `第${f}層 ためし${tryN}：幅${r.w} ${res.ok ? '越えられる' : '越えられない(' + res.why + ' ' + res.far.toFixed(0) + ')'} 必要な鉛筆 ${res.need}（目安 ${lo}〜${hi}） ${res.ms}ms`;
     console.log(line);

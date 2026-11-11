@@ -77,6 +77,7 @@ function life(FT, lv, cor, ai, pw) { const r = new FT.Run(lv, cor), rec = new FT
   await NA.liveAdd('なすP', 'https://youtube.com/live/abc', 'いま配信中').then(() => ok(true, '配信中を書けた')).catch(e => ok(false, '配信中を書けない ' + e.message));
   const lv = await NB.live(); ok(lv.length === 1, 'みんなが配信中を読める');
   await NA.boardSetPin('all', 'お知らせです').then(() => ok(true, 'お知らせを書けた')).catch(e => ok(false, 'お知らせを書けない ' + e.message));
+  await NA.resetFloor(2).then(() => ok(true, '管理人は層の記録を全部消せる')).catch(e => ok(false, '層の記録を消せない ' + e.message));
   const g = await NA.dlog(1); ok(g.length === 1 && g[0].n === 3, '鉛筆を置いた人の一覧');
   await NA.removeBy(1, g[0]).then(() => ok(true, 'その人の鉛筆を取り除けた')).catch(e => ok(false, '取り除けない ' + e.message));
   await NA.setEnd().then(() => ok(true, 'ゲームを終えられた')).catch(e => ok(false, '終えられない ' + e.message));

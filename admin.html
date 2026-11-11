@@ -24,8 +24,8 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
  <div class="box">
   層の番号 <input id="fl" type="number" min="1" max="100" value="1" style="width:90px"><button id="bFl">鉛筆を置いた人を見る</button>
   <div id="who"></div>
-  <p class="small">「取り除く」は、その人が置いた鉛筆を全部消します（にせの鉛筆・荒らし用）。「この層の鉛筆を全部消す」は、元にもどせません。越えた層・挑戦中の層の鉛筆は、ふつうは消さないでください。</p>
-  <button class="red" id="bReset">この層の鉛筆を全部消す</button>
+  <p class="small">「取り除く」は、その人が置いた鉛筆を全部消します（にせの鉛筆・荒らし用）。「この層の記録を全部消す」は、元にもどせません。越えた層・挑戦中の層の鉛筆は、ふつうは消さないでください。</p>
+  <button class="red" id="bReset">この層の記録を全部消す（鉛筆・越えた記録・一番乗り）</button>
   <button id="bCkpt">ここまでを「本物」として確かめ済みにする</button>
  </div>
  <h2>配信中</h2>
@@ -74,7 +74,7 @@ async function reps(){
 let G=[];
 $('bFl').onclick=async()=>{const f=+$('fl').value;G=await N.dlog(f);let h='<table><tr><th>匿名ID</th><th>置いた数</th><th>はじめ</th><th>さいご</th><th></th></tr>';G.slice(0,60).forEach((g,i)=>{h+=`<tr><td class="small">${esc(g.u.slice(0,10))}…</td><td>${g.n}</td><td>${tm(g.first)}</td><td>${tm(g.last)}</td><td><button class="red" data-i="${i}">取り除く</button></td></tr>`;});$('who').innerHTML=G.length?h+'</table>':'まだだれも置いていません';
   $('who').querySelectorAll('[data-i]').forEach(b=>b.onclick=async()=>{if(!confirm('この人の鉛筆を全部取り除きますか？'))return;const n=await N.removeBy(f,G[+b.dataset.i]);log(`第${f}層：${n}か所から取り除いた`);$('bFl').onclick();});};
-$('bReset').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層の鉛筆を全部消しますか？（元にもどせません）`))return;await N.resetFloor(f);log(`第${f}層の鉛筆を全部消した`);};
+$('bReset').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層の鉛筆・越えた記録・一番乗りを全部消しますか？（元にもどせません）`))return;try{await N.resetFloor(f);log(`第${f}層の記録を全部消した`);status();}catch(e){alert('消せませんでした');}};
 $('bCkpt').onclick=async()=>{const f=+$('fl').value;if(!confirm(`第${f}層までを確かめ済みにしますか？`))return;await N.setCkpt(f);log(`第${f}層までを確かめ済みにした`);status();};
 async function lives(){const L=await N.live().catch(()=>[]);$('lives').innerHTML=L.length?L.map(x=>`<div>● ${esc(x.n)} <a href="${esc(x.u)}" target="_blank">${esc(x.u)}</a> ${esc(x.m)} <button data-id="${x.id}">消す</button></div>`).join(''):'<p class="small">いまはだれも出ていません</p>';$('lives').querySelectorAll('[data-id]').forEach(b=>b.onclick=async()=>{await N.liveDel(b.dataset.id);lives();});}
 $('bLive').onclick=async()=>{try{await N.liveAdd($('lvN').value,$('lvU').value,$('lvM').value);$('lvN').value=$('lvU').value=$('lvM').value='';lives();log('配信中に出した');}catch(e){alert(e.message);}};
