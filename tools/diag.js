@@ -68,4 +68,17 @@ const add = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
   console.log('再生が合わない記録：'); for (const [k, v] of Object.entries(rs).sort((a, b) => b[1] - a[1])) console.log('  ' + v + '　' + k);
   console.log('合わない記録の例：'); for (const x of rep.filter(x => !x.oldOk).slice(0, 25)) console.log('  ', JSON.stringify(x));
   console.log('30分ごと（ok/だめ）：' + Object.keys(buckets).sort((a, b) => a - b).map(b => `${b}:${buckets[b].ok || 0}/${buckets[b].ng || 0}`).join(' '));
+  // 越えた記録：確かめ済みの鉛筆だけで再生して鉛筆立てに入るか。入らないとき、その人に見えていた鉛筆のままなら入るか
+  const clears = Object.entries((await rest('clear/' + F)) || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => c && typeof c.t === 'number').sort((a, b) => a.t - b.t);
+  const op = await rest('open/' + F).catch(() => null);
+  console.log(`越えた記録 ${clears.length}件　開いた印 ${op ? new Date(op.t).toISOString() + ' ' + op.n + ' ' + op.id : 'なし'}`);
+  for (const c of clears.slice(0, 12)) {
+    const snap = FT.corParse(c.c || ''), ts = V.trustSnap(lv, snap, present), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
+    const a1 = FT.replay(lv, ts.m, c.r, lim), a2 = FT.replay(lv, snap, c.r, lim);
+    let o3 = null; try { const or = OFT.replay(olv, snap, c.r, lim); o3 = or.clear ? '入る' : '入らない'; } catch (e) { o3 = 'err'; }
+    let tot = 0, tr = 0; for (const [, x] of snap) tot += x.n; for (const [, x] of ts.m) tr += x.n;
+    // 足りなかった山（確かめ済みより多く見えていた所）
+    const short = []; for (const [k, x] of snap) { const q = present[k] || 0, cap = FT.capOf(lv, k); if (!FT.keyOk(lv, k)) short.push(k + ':はみ出し'); else if (Math.min(x.n, cap) > q) short.push(k + ':' + q + '/' + Math.min(x.n, cap) + (x.n > cap ? '(線こえ' + x.n + ')' : '')); }
+    console.log(`  ${new Date(c.t).toISOString()} ${c.id === (op && op.id) ? '★' : ' '} 「${c.n}」 確かめ済みだけ:${a1.clear ? '入る' : '入らない(' + (a1.dead || (a1.over ? 'end' : 'time')) + ' x=' + a1.p.x.toFixed(1) + ')'}　見えていたまま:${a2.clear ? '入る' : '入らない'}　前の動き:${o3}　鉛筆 ${tr}/${tot}本　足りない山 ${short.length}：${short.slice(0, 8).join(' ')}`);
+  }
 })().catch(e => { console.error(e); process.exit(1); });
