@@ -320,10 +320,18 @@
   };
   // その層を本当に越えた一番早い記録
   const VC = () => store('el_vc3') || {};
+  // 鉛筆の確かめはせずに、その層の鉛筆（データベースの数）だけ読む（越えた記録を確かめるため。軽い）
+  N.cellsOnly = async function (lv) {
+    const F = await floorState(lv);
+    if (N.ready() && !N.frozen && Date.now() - F.fullAt > 3000) {
+      try { const v = await rest('cells/' + lv.f, { orderBy: 't', startAt: F.maxT + 1 }); for (const k in v || {}) { if (!v[k]) continue; F.raw[k] = v[k]; if (v[k].t > F.maxT) F.maxT = v[k].t; } F.fullAt = Date.now(); } catch (e) { }
+    }
+    return F;
+  };
   N.firstClear = async function (lv) {
     const f = lv.f;
-    if (N.more(lv)) return { wait: true };
-    const F = lv._F, rs = F ? F.rmKey : '';
+    // 鉛筆の確かめが終わるのを待たない（越えた記録は、データベースにある鉛筆でも確かめられるので）
+    const F = lv._F, rs = F ? F.rmKey : '', done = !N.more(lv);
     const sv = (F && F.sv) | 0, vc = VC(); let cur = vc[f] && vc[f].rs === rs && (vc[f].sv | 0) === sv ? vc[f].t : 0;
     let budget = 120 * 60 * 120;
     const present = N.present(lv);
@@ -335,7 +343,7 @@
         if (budget <= 0) return { wait: true };
         budget -= Math.min(120 * 60 * 10, Math.max(1, c.k | 0));
         if (await N.verifyClearAsync(lv, c, present, F && F.raw)) return c;
-        cur = c.t; const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc3', o);
+        cur = c.t; if (done) { const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc3', o); }   // 確かめが終わっていないときは、あとでもう一度見る
       }
       if (list.length < 10) break;
     }

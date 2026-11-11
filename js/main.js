@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '12';
+  FT.VER = '13';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -48,10 +48,11 @@
     try {
       for (let i = 0; i < 4; i++) {
         const f = W.latest; if (f > 100 || !W.open[f] || okFloor(f)) break;
-        const lv = getLevel(f); await N.loadCells(lv);
+        const lv = getLevel(f); await N.cellsOnly(lv);
         const c = await N.firstClear(lv);
         if (!c || c.wait) break;
         W.okLocal[f] = W.open[f].t; N.store('el_okf', W.okLocal); computeLatest(); paintTitle();
+        if (S.mode === 'play' || S.mode === 'dead' || S.mode === 'clear') toast(T('第{0}層が開いた！', W.latest), T('タイトルの「最前線へ」から行けます'), 3500);
       }
     } catch (e) { } finally { chainBusy = false; }
   }
@@ -215,7 +216,7 @@
       }
       W.okLocal[lv.f] = (W.open[lv.f] && W.open[lv.f].t) || Date.now();
       // 自分で越えた層は、すぐ確かめて開く（越えた記録を再生）
-      const okNow = await N.verifyClearAsync(lv, { t: 1, r: S.rec.str(), c: S.start, k: r.t }, N.present(lv)).catch(() => false);
+      const okNow = await N.verifyClearAsync(lv, { t: 1, r: S.rec.str(), c: S.start, k: r.t }, N.present(lv), lv._F && lv._F.raw).catch(() => false);
       if (okNow) { const op = await N.rest('open/' + lv.f).catch(() => null); if (op) { const keep = W.open[lv.f]; W.open[lv.f] = Object.assign(op, keep && keep.id === op.id && keep.w ? { w: keep.w } : {}); W.okLocal[lv.f] = op.t; } N.store('el_okf', W.okLocal); }
       computeLatest();
     } catch (e) { toast(T('記録を送れませんでした'), T('少したってから、もう一度')); }
@@ -933,6 +934,8 @@
   // =============================================
   //  はじまり
   // =============================================
+  // 開いた層を1分ごとに読みなおす（だれかが最前線を越えたら、タイトルに戻らなくても次の層が開くように）
+  setInterval(() => { if (OFFLINE || document.hidden || S.mode === 'spec' || S.mode === 'watch') return; refreshWorld().then(() => { if (S.mode === 'title') paintTitle(); }).catch(() => { }); }, 60000);
   // いま遊んでいる人の数（管理画面の同接）：見えている間、1分ごとに「いる」と知らせる（タイトルは0、遊んでいる層の番号）
   const pingNow = () => { if (OFFLINE || document.hidden) return; N.ping(S.mode === 'title' || !S.lv ? 0 : S.lv.f); };
   setInterval(pingNow, 60000); setTimeout(pingNow, 5000);
