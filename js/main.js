@@ -9,7 +9,7 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
-  const GAME_URL = 'https://nasubi-no-oniwa.github.io/enpitsu-life/', TAG = '#エンピツライフ';
+  const GAME_URL = 'https://nasubi-no-oniwa.github.io/enpitsu-life/', TAG = '#エンピツライフ #ブラウザゲーム';
   const OFFLINE = /[?&]offline=1/.test(location.search) || !N.ready();
   // ---------- 自分のこと（この端末だけ） ----------
   const ME = Object.assign({ dead: 0, best: 1, how: 0, xid: '', bname: '', bpost: 0, bhide: [], seen: 0 }, N.store('el_me') || {});
