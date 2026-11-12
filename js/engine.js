@@ -262,10 +262,10 @@
   //  飛ぶ：t.g.角度.強さ  空中の左右：t.s.0〜3（変わったときだけ）  を36進数で並べる
   FT.Rec = class {
     constructor() { this.a = []; this.last = 0; }
-    go(t, ai, pw) { this.a.push(t.toString(36) + 'g' + (ai | 0).toString(36) + 'p' + (pw | 0).toString(36)); }
+    go(t, ai, pw) { this.a.push(t.toString(36) + '_' + (ai | 0).toString(36) + '_' + (pw | 0).toString(36)); }   // 前は「時刻g角度p強さ」（読み方があいまいになることがあった）
     steer(t, b) { if (b !== this.last) { this.a.push(t.toString(36) + 's' + b); this.last = b; } }
     str() { return this.a.join('.'); }
-    static parse(s) {
+    static parseRaw(s) {
       const go = new Map(), st = [];
       for (const v of String(s || '').split('.')) {
         let m = /^([0-9a-z]+)g([0-9a-z]+)p([0-9a-z]+)$/.exec(v);
@@ -282,8 +282,75 @@
   FT.corStr = cor => { const a = []; for (const [k, c] of cor) a.push(k * 31 + Math.min(30, c.n | 0 || 1)); return a.sort((x, y) => x - y).map(v => v.toString(36)).join('.'); };
   FT.corParse = s => { const m = new Map(); for (const v of String(s || '').split('.')) { if (!v) continue; const n = parseInt(v, 36); if (!(n >= 0)) continue; m.set(Math.floor(n / 31), { n: n % 31 || 1, name: '' }); } return m; };
   // 記録を再生する
-  FT.replay = function (lv, cor, recStr, lim) {
-    const r = new Run(lv, cor), inp = FT.Rec.parse(recStr);
+  // ---------- 操作の記録を読む ----------
+  //  飛ぶ記録「時刻g角度p強さ」は、角度に g・強さに p の字が入ると読み方が2つ以上になることがあった（36進数なので）。
+  //  あいまいな所は、ありうる読み方をすべて出し、再生しながら「飛んだ瞬間は必ず立っていた」ことで正しい読み方をえらぶ。
+  //  新しい記録は「時刻_角度_強さ」（_ は36進数に出ない字）なので、あいまいにならない。
+  const okN = s => s.length > 0 && /^[0-9a-z]+$/.test(s) && (s.length === 1 || s[0] !== '0');
+  FT.Rec.tokens = function (s) {
+    const out = [];
+    for (const v of String(s || '').split('.')) {
+      if (!v) continue;
+      let m = /^([0-9a-z]+)_([0-9a-z]+)_([0-9a-z]+)$/.exec(v);
+      if (m) { out.push({ k: 'g', c: [[parseInt(m[1], 36), parseInt(m[2], 36), parseInt(m[3], 36)]] }); continue; }
+      m = /^([0-9a-z]+)s([0-3])$/.exec(v);
+      if (m && okN(m[1])) { out.push({ k: 's', t: parseInt(m[1], 36), b: +m[2] }); continue; }
+      const c = [], n = v.length;
+      for (const pl of [1, 2]) for (const al of [1, 2]) {
+        const pi = n - pl - 1, gi = pi - al - 1; if (gi < 1 || v[pi] !== 'p' || v[gi] !== 'g') continue;
+        const tS = v.slice(0, gi), aS = v.slice(gi + 1, pi), pS = v.slice(pi + 1);
+        if (!okN(tS) || !okN(aS) || !okN(pS)) continue;
+        const t = parseInt(tS, 36), ai = parseInt(aS, 36), pw = parseInt(pS, 36);
+        if (ai > 240 || pw > 1000 || c.some(x => x[0] === t && x[1] === ai && x[2] === pw)) continue;
+        c.push([t, ai, pw]);
+      }
+      if (c.length) out.push({ k: 'g', c });
+    }
+    return out;
+  };
+  // tokens から、時刻ごとの入力を返す関数（gos：えらんだ飛ぶ記録 [t, ai, pw]）
+  function inputOf(st, gos) {
+    const go = new Map(gos.map(g => [g[0], [g[1], g[2]]]));
+    let i = 0, cur = 0;
+    return t => { while (i < st.length && st[i][0] <= t) { cur = st[i][1]; i++; } const g = go.get(t); return { L: cur & 1, R: (cur >> 1) & 1, go: g || null }; };
+  }
+  const cloneRun = r => { const c = Object.create(Object.getPrototypeOf(r)); Object.assign(c, r); c.p = Object.assign({}, r.p); c.events = []; c.trail = []; c.place = r.place ? Object.assign({}, r.place) : r.place; return c; };
+  // 再生して、正しい読み方の入力をえらぶ。want：さがしている終わり方（なければ、最後まで矛盾なく進んだもの）
+  FT.Rec.resolve = function (lv, cor, recStr, lim, want) {
+    const toks = FT.Rec.tokens(recStr);
+    const st = toks.filter(x => x.k === 's').map(x => [x.t, x.b]).sort((a, b) => a[0] - b[0]);
+    const gt = toks.filter(x => x.k === 'g');
+    // あいまいなものがなければ、そのまま
+    if (gt.every(x => x.c.length === 1)) { const gos = gt.map(x => x.c[0]); return { gos, inp: inputOf(st, gos) }; }
+    let tries = 0, best = null;
+    const steerAt = t => { let cur = 0; for (const x of st) { if (x[0] <= t) cur = x[1]; else break; } return cur; };
+    function go(i, r, chosen, lastT) {
+      if (++tries > 400) return null;
+      if (i === gt.length) {
+        while (!r.over && r.t < lim) { const b = steerAt(r.t + 1); r.step({ L: b & 1, R: (b >> 1) & 1, go: null }); }
+        if (!want || want(r)) return chosen;
+        if (!best) best = chosen;
+        return null;
+      }
+      for (const cd of gt[i].c) {
+        const t = cd[0]; if (t < lastT) continue;
+        const q = cloneRun(r);
+        while (!q.over && q.t < t - 1 && q.t < lim) { const b = steerAt(q.t + 1); q.step({ L: b & 1, R: (b >> 1) & 1, go: null }); }
+        if (q.over || q.p.fly || q.t !== t - 1) continue;   // 飛んだ瞬間は、立っていたはず
+        const b = steerAt(t); q.step({ L: b & 1, R: (b >> 1) & 1, go: [cd[1], cd[2]] });
+        const res = go(i + 1, q, chosen.concat([cd]), t);
+        if (res) return res;
+      }
+      return null;
+    }
+    const gos = go(0, new Run(lv, cor), [], 0) || best || gt.map(x => x.c[0]);
+    return { gos, inp: inputOf(st, gos) };
+  };
+  // 時刻ごとの入力（あいまいなときは、ひとつ目の読み方。正しく再生したいときは resolve を使う）
+  FT.Rec.parse = function (s) { const toks = FT.Rec.tokens(s); return inputOf(toks.filter(x => x.k === 's').map(x => [x.t, x.b]).sort((a, b) => a[0] - b[0]), toks.filter(x => x.k === 'g').map(x => x.c[0])); };
+  FT.replay = function (lv, cor, recStr, lim, want) {
+    const { inp } = FT.Rec.resolve(lv, cor, recStr, lim, want);
+    const r = new Run(lv, cor);
     while (!r.over && r.t < lim) r.step(inp(r.t + 1));
     return r;
   };

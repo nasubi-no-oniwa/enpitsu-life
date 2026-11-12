@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '15';
+  FT.VER = '16';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -913,9 +913,9 @@
     if (!c || typeof c.r !== 'string') { toast(T('記録が読めませんでした')); return; }
     const lv = getLevel(f), view = FT.corParse(c.c || ''), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
     let use = view;
-    if (!FT.replay(lv, view, c.r, lim).clear) {
+    if (!FT.replay(lv, view, c.r, lim, r => r.clear).clear) {
       // 見えていた鉛筆のままでは同じにならないとき：確かめ済みの鉛筆だけで（まとめの確かめと同じ形）
-      try { await N.loadCells(lv); const ts = FT.V.trustSnap(lv, view, N.present(lv)); if (FT.replay(lv, ts.m, c.r, lim).clear) use = ts.m; } catch (e) { }
+      try { await N.loadCells(lv); const ts = FT.V.trustSnap(lv, view, N.present(lv)); if (FT.replay(lv, ts.m, c.r, lim, r => r.clear).clear) use = ts.m; } catch (e) { }
     }
     Object.assign(WT, { c, f, name: nameOf(o), view, use, gos: parseGos(c.r), lim });
     startWatch();
@@ -923,7 +923,7 @@
   function startWatch() {
     const lv = getLevel(WT.f);
     for (const o of document.querySelectorAll('.ov')) o.classList.remove('on');
-    S.lv = lv; S.cor = new Map(WT.view); S.run = new FT.Run(lv, WT.use); WT.inp = FT.Rec.parse(WT.c.r); WT.done = false;
+    S.lv = lv; S.cor = new Map(WT.view); S.run = new FT.Run(lv, WT.use); WT.inp = FT.Rec.resolve(lv, WT.use, WT.c.r, WT.lim, r => r.clear).inp; WT.done = false;
     S.trail = []; S.fx = []; S.aim = null; S.acc = 0; S.shake = 0;
     const p = S.run.p; S.cam.x = p.x + 3; S.cam.y = p.y - 2; S.cam.z = 13;
     S.mode = 'watch'; S.paused = false;
@@ -961,7 +961,7 @@
     $('vText').innerHTML = `<span class="spin"></span> ${esc(T('動画を作っています…'))}`;
     const vc = document.createElement('canvas'); vc.width = 720; vc.height = 1280; const g = vc.getContext('2d');
     const keep = { run: S.run, trail: S.trail, fx: S.fx, mode: S.mode, cam: S.cam, aim: S.aim, cor: S.cor };
-    const lv = S.lv, run = new FT.Run(lv, d.startCor), inp = FT.Rec.parse(d.rec);
+    const lv = S.lv, run = new FT.Run(lv, d.startCor), inp = FT.Rec.resolve(lv, d.startCor, d.rec, d.ticks + 2, q => q.over && String(q.place && q.place.k) === String(d.k)).inp;
     const startT = Math.max(0, d.ticks - 120 * 5);
     while (run.t < startT && !run.over) run.step(inp(run.t + 1));
     S.run = run; S.trail = []; S.fx = []; S.mode = 'play'; S.aim = null; S.cam = { x: run.p.x + 2, y: run.p.y - 2, z: 15 }; S.cor = d.startCor;

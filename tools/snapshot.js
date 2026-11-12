@@ -18,7 +18,8 @@ const floors = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/levels.json'))).
 const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
 // 確かめ方の版（変えたら、前のまとめの確かめをやりなおす）。2：赤い線より上の分は数えない　3：はみ出した鉛筆は数えない　4：確かめ済みの鉛筆だけで再生して合えば通す（つられて通らないのをなくす）
 // 5：越えた記録は、データベースにある鉛筆でも再生する・ちがう人が3人以上越えていれば越えられたとみなす（管理人が確かめなくても先へ）
-const SVER = 5;
+// 6：操作の記録の読みまちがい（角度に g・強さに p が入るとき）を直して、ぜんぶ確かめなおす
+const SVER = 6;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);

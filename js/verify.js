@@ -36,7 +36,7 @@
     if (!it || typeof it.r !== 'string' || typeof it.c !== 'string' || !(it.k >= 1) || typeof it.p !== 'string') return 'nodata';
     if (it.k > V.DMAX) return 'long';
     const snap = FT.corParse(it.c), ts = V.trustSnap(lv, snap, present);
-    const r = FT.replay(lv, ts.m, it.r, (it.k | 0) + 2);
+    const r = FT.replay(lv, ts.m, it.r, (it.k | 0) + 2, q => q.over && !q.clear && q.place && String(q.place.k) === it.p);
     // 合わない：確かめていない鉛筆を足場にしていた（'snap'）・前の版のはみ出し（'old'）は、だめの数に入れない
     if (!(r.over && !r.clear && r.place && r.place.k >= 0 && String(r.place.k) === it.p)) return ts.cut ? 'snap' : (V.oldRec(lv, snap, it.p) ? 'old' : 'replay');
     // 積み重ねる上限（赤い線）をこえていないか
@@ -67,8 +67,8 @@
   V.verifyClear = function (lv, c, present, raw) {
     if (!c || typeof c.r !== 'string' || typeof c.c !== 'string' || typeof c.t !== 'number' || !(c.k >= 1)) return false;
     const snap = FT.corParse(c.c), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
-    if (FT.replay(lv, V.trustSnap(lv, snap, present).m, c.r, lim).clear) return true;
-    return !!raw && FT.replay(lv, V.trustSnap(lv, snap, V.dbOf(raw)).m, c.r, lim).clear;
+    if (FT.replay(lv, V.trustSnap(lv, snap, present).m, c.r, lim, q => q.clear).clear) return true;
+    return !!raw && FT.replay(lv, V.trustSnap(lv, snap, V.dbOf(raw)).m, c.r, lim, q => q.clear).clear;
   };
   // 越えた記録がどれも再生で合わなくても、ちがう人が3人以上越えていれば、その層は越えられたとみなす（管理人が確かめなくても先へ進めるように）
   V.CLEAR_PEOPLE = 3;
