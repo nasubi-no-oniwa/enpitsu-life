@@ -148,7 +148,10 @@
   const plainLv = lv => ({ f: lv.f, w: lv.w, h: lv.h, tiles: lv.tiles, cap: lv.cap, start: lv.start, goal: lv.goal, ents: lv.ents });
   N.plainLv = plainLv;
   const runDeaths = (lv, items, present, bad, budget, wait) => inWorker('deaths', { lv: plainLv(lv), items: items.map(d => ({ id: d.id, p: d.p, u: d.u, t: d.t, r: d.r, c: d.c, k: d.k, s: d.s | 0 })), present, bad, budget, wait: wait || [] }, () => V.verifyDeaths(lv, items, present, bad, budget, wait));
-  N.verifyClearAsync = (lv, c, present, raw) => inWorker('clear', { lv: plainLv(lv), c: { t: c.t, r: c.r, c: c.c, k: c.k }, present, raw: raw ? V.dbOf(raw) : null }, () => V.verifyClear(lv, c, present, raw));
+  // 裏の計算役へは、山ごとの本数を元の形（{ 場所: { n } }）のまま渡す
+  //  （前は本数だけの形にして渡していて、裏でもう一度本数を取り出したときに全部の山が1本になり、越えた記録がデータベースの鉛筆で確かめられず、次の層が開かなかった）
+  const rawN = raw => { const o = {}; for (const k in raw || {}) { const c = raw[k]; if (c) o[k] = { n: c.n | 0 }; } return o; };
+  N.verifyClearAsync = (lv, c, present, raw) => inWorker('clear', { lv: plainLv(lv), c: { t: c.t, r: c.r, c: c.c, k: c.k }, present, raw: raw ? rawN(raw) : null }, () => V.verifyClear(lv, c, present, raw));
   async function floorState(lv) {
     const f = lv.f;
     if (lv._F) return lv._F;
