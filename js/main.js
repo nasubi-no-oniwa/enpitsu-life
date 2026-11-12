@@ -2,6 +2,13 @@
 //  エンピツライフ  画面・操作・絵（ノートの落書き風）
 //  動きの計算は engine.js、通信は net.js。ここは見せ方と流れだけ
 // =============================================
+
+// Xの投稿で引用するツイート（なすびのお庭の管理ページ quote/ で日本語・英語を貼りかえられる）
+var NQ=window.__nq||(window.__nq={q:{}});if(!NQ.f){NQ.f=1;fetch('https://ft-red-default-rtdb.asia-southeast1.firebasedatabase.app/xquote/g/enpitsu-life.json').then(r=>r.json()).then(d=>{if(d&&typeof d==='object')NQ.q=d;}).catch(()=>{});}
+function quoteURL(){let l='';try{if(typeof lang==='string')l=lang;}catch(e){}if(!l)l=document.documentElement.lang||'ja';const u=(l.slice(0,2)==='ja'?NQ.q.ja:NQ.q.en)||'';return /^https:\/\/x\.com\/[A-Za-z0-9_]{1,15}\/status\/\d{5,25}$/.test(u)?u:'';}
+function xIntent(text,url){const q=quoteURL();return 'https://x.com/intent/post?text='+encodeURIComponent(q?text+'\n'+url:text)+'&url='+encodeURIComponent(q||url);}
+function xIntentT(text){const q=quoteURL();return 'https://x.com/intent/post?text='+encodeURIComponent(text)+(q?'&url='+encodeURIComponent(q):'');}
+function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.text=(o.text||'')+(o.url?'\n'+o.url:'')+'\n'+q;delete o.url;return o;}
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
@@ -856,7 +863,7 @@
   // ---------- 投稿 ----------
   function deadText() { const d = S.deadInfo; if (!d) return ''; return (d.k >= 0 ? T('エンピツライフ 第{0}層で{1}本目の鉛筆になった。名前は「{2}」', d.f, fmt(d.count), d.name) : T('エンピツライフ 第{0}層で「{1}」は砕けた', d.f, d.name)) + '\n' + GAME_URL + '\n' + TAG; }
   function clearText() { const c = S.clearInfo; if (!c) return ''; return (c.opened ? T('エンピツライフ 第{0}層を一番乗りで越えた！', c.f) : T('エンピツライフ 第{0}層を越えた！', c.f)) + '\n' + GAME_URL + '\n' + TAG; }
-  function shareX(text) { window.open('https://x.com/intent/post?text=' + encodeURIComponent(text), '_blank', 'noopener'); }
+  function shareX(text) { window.open(xIntentT(text), '_blank', 'noopener'); }
   // =============================================
   //  観戦モード（管理画面の「詰みの知らせ」から開く：知らせた人に見えていた鉛筆と、立っていた所を見る）
   // =============================================
@@ -1000,7 +1007,7 @@
     const url = URL.createObjectURL(vidBlob); $('vPlay').src = url; $('vPlay').hidden = false; $('vPlay').play().catch(() => { });
     $('vText').textContent = T('約{0}秒の動画ができました', Math.round((end - startT) / 120 + 1.3));
     const file = new File([vidBlob], 'enpitsu-life.' + (mime.includes('mp4') ? 'mp4' : 'webm'), { type: vidBlob.type });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) { $('vShare').hidden = false; $('vShare').onclick = () => navigator.share({ files: [file], text: deadText() }).catch(() => { }); }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { $('vShare').hidden = false; $('vShare').onclick = () => navigator.share(nqS({ files: [file], text: deadText() })).catch(() => { }); }
     $('vSave').hidden = false; $('vSave').onclick = () => { const a = document.createElement('a'); a.href = url; a.download = file.name; a.click(); };
   }
   $('vClose').onclick = () => { ov('oVid', 0); $('vPlay').pause(); };
