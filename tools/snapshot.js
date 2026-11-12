@@ -19,7 +19,8 @@ const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
 // 確かめ方の版（変えたら、前のまとめの確かめをやりなおす）。2：赤い線より上の分は数えない　3：はみ出した鉛筆は数えない　4：確かめ済みの鉛筆だけで再生して合えば通す（つられて通らないのをなくす）
 // 5：越えた記録は、データベースにある鉛筆でも再生する・ちがう人が3人以上越えていれば越えられたとみなす（管理人が確かめなくても先へ）
 // 6：操作の記録の読みまちがい（角度に g・強さに p が入るとき）を直して、ぜんぶ確かめなおす
-const SVER = 6;
+// 7：確かめ方を変えたときは、一番乗りも確かめなおす（6で、本当の一番乗りが前のまま別の人になっていた）
+const SVER = 7;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);
@@ -56,7 +57,7 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
     } else if (prev) states[f] = { st: prev.st, raw: prev.raw };
   }
   // 越えた記録を確かめる：下の層から順に
-  const prevOk = prevIdx.ok || {};
+  const prevOk = prevIdx.ver === SVER ? (prevIdx.ok || {}) : {};   // 確かめ方を変えたら、一番乗りも確かめなおす
   for (let f = 1; f <= 100; f++) {
     const o = idx.open[f]; if (!o) break;
     if (idx.ckpt !== null && f <= idx.ckpt) { idx.ok[f] = { t: o.t, id: o.id, n: o.n, w: o.w, x: o.x }; continue; }
