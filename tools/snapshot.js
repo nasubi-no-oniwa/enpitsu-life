@@ -20,7 +20,8 @@ const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
 // 5：越えた記録は、データベースにある鉛筆でも再生する・ちがう人が3人以上越えていれば越えられたとみなす（管理人が確かめなくても先へ）
 // 6：操作の記録の読みまちがい（角度に g・強さに p が入るとき）を直して、ぜんぶ確かめなおす
 // 7：確かめ方を変えたときは、一番乗りも確かめなおす（6で、本当の一番乗りが前のまま別の人になっていた）
-const SVER = 7;
+// 8：届く順番が入れかわった記録を、足場が確かめられたあとで確かめなおす
+const SVER = 8;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);
@@ -51,7 +52,7 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
       for (const k in v || {}) if (v[k]) raw[k] = { n: v[k].n, l: v[k].l, t: v[k].t };
       const items = V.newItems(st, await rest('dlog/' + f, { orderBy: 't', startAt: st.t }));
       await V.advance(floors[f - 1], st, raw, items, id => rest('drec/' + f + '/' + id), { ms: Math.max(1000, LIMIT - (Date.now() - T0)) });
-      const out = { at, ver: SVER, f, rmKey, d: (STAT[f] && STAT[f].d) || 0, raw, st: { t: st.t, ti: st.ti, P: st.P, bad: st.bad, S: st.S || {} } };
+      const out = { at, ver: SVER, f, rmKey, d: (STAT[f] && STAT[f].d) || 0, raw, st: { t: st.t, ti: st.ti, P: st.P, bad: st.bad, S: st.S || {}, W: st.W || [] } };
       fs.writeFileSync(file, JSON.stringify(out)); idx.floors[f] = at;
       states[f] = { st, raw };
     } else if (prev) states[f] = { st: prev.st, raw: prev.raw };

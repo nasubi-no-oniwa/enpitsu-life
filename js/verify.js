@@ -44,21 +44,51 @@
     if ((present[it.p] || 0) + 1 > Math.max(1, lv.cap[tx] | 0)) return 'cap';
     return 'ok';
   };
+  // 足りなかった山（{場所: 要る本数} の組）：始まりに見えていた本数に、確かめ済みが届いていない所
+  V.lackOf = (lv, it, present) => { const out = []; for (const [k, c] of FT.corParse(it.c || '')) { if (!FT.keyOk(lv, k)) continue; const need = Math.min(c.n, FT.capOf(lv, k)); if (need > (present[k] || 0)) out.push([k, need]); } return out; };
+  // 待ちの記録を、どれだけの間・何件まで取っておくか
+  V.WAIT_MS = 15 * 60000; V.WAIT_MAX = 150;
   // まとめて確かめる。budget：計算する動きの量
-  V.verifyDeaths = function (lv, items, present, bad, budget) {
-    const add = [], addS = [], badInc = {}; let i = 0;
+  //  wait：足場の鉛筆がまだ確かめられていなくて通らなかった記録（'snap'）。あとからその鉛筆が確かめられたら、もう一度確かめる
+  //  （記録の届く順番が、実際に刺さった順番と入れかわることがある。前は、そのまま後ろの記録まで連鎖して数えられなかった）
+  V.verifyDeaths = function (lv, items, present, bad, budget, wait) {
+    const add = [], addS = [], badInc = {}; let i = 0, lastT = 0;
     present = Object.assign({}, present);
+    const W = (wait || []).filter(w => w && Array.isArray(w.lack)).map(w => Object.assign({}, w));
+    const okNow = it => { present[it.p] = (present[it.p] || 0) + 1; add.push(it.p); addS.push(Math.max(0, Math.min(8, it.s | 0))); };
+    // 確かめ済みが増えた山を足場にして待っていた記録を、もう一度確かめる（それで通った鉛筆が、また別の待ちを通すことがある）
+    const wake = key => {
+      const q = [String(key)];
+      while (q.length && W.length) {
+        const k = q.shift();
+        for (let j = 0; j < W.length; j++) {
+          const w = W[j];
+          if (!w.lack.some(x => String(x[0]) === k)) continue;
+          if (!w.lack.every(x => (present[x[0]] || 0) >= x[1])) continue;
+          if (budget <= 0) return;
+          budget -= Math.max(1, w.k | 0); w.n = (w.n | 0) + 1;
+          const res = V.verifyDeath(lv, w, present);
+          if (res === 'ok') { W.splice(j, 1); j--; okNow(w); q.push(String(w.p)); }
+          else if (res === 'snap' && w.n < 6) w.lack = V.lackOf(lv, w, present);
+          else { W.splice(j, 1); j--; }
+        }
+      }
+    };
     for (; i < items.length; i++) {
       const it = items[i];
+      lastT = Math.max(lastT, it.t || 0);
       if (((bad[it.u] || 0) + (badInc[it.u] || 0)) >= 3) continue;
       if (budget <= 0) break;
       if (!(it.k <= V.DMAX)) continue;
       budget -= Math.max(1, it.k | 0);
       const res = V.verifyDeath(lv, it, present);
-      if (res === 'ok') { present[it.p] = (present[it.p] || 0) + 1; add.push(it.p); addS.push(Math.max(0, Math.min(8, it.s | 0))); }
+      if (res === 'ok') { okNow(it); wake(it.p); }
       else if (res === 'replay') badInc[it.u] = (badInc[it.u] || 0) + 1;
+      else if (res === 'snap') { const lack = V.lackOf(lv, it, present); if (lack.length) W.push({ id: it.id, p: it.p, u: it.u, t: it.t, r: it.r, c: it.c, k: it.k, s: it.s | 0, lack, n: 0 }); }
     }
-    return { done: i, add, addS, badInc };
+    // 古すぎる待ちは捨てる（ずっと足場が確かめられないものは、本当に足場がなかった）
+    const keep = W.filter(w => !lastT || w.t >= lastT - V.WAIT_MS).slice(-V.WAIT_MAX);
+    return { done: i, add, addS, badInc, wait: keep };
   };
   // データベースにある鉛筆の数（{ 場所: 本数 }・30本まで）
   V.dbOf = raw => { const o = {}; for (const k in raw || {}) { const c = raw[k]; if (c) o[k] = Math.min(30, c.n | 0 || 1); } return o; };
@@ -75,7 +105,7 @@
   V.manyClears = list => new Set((list || []).filter(c => c && typeof c.u === 'string' && typeof c.t === 'number').map(c => c.u)).size >= V.CLEAR_PEOPLE;
   // ---------- 1つの層の確かめの状態 ----------
   //  st：{ t：どこまで確かめたか, ti：その時刻で終えた記録, P：{場所: 確かめた本数}, bad：{匿名ID: だめな数} }
-  V.newState = () => ({ t: 0, ti: [], P: {}, bad: {} });
+  V.newState = () => ({ t: 0, ti: [], P: {}, bad: {}, W: [] });
   // 確かめた鉛筆（present の形：{ 場所: 本数 }）。データベースの本数より多くはしない
   V.presentOf = (st, raw) => { const o = {}; for (const k in st.P) { const c = raw[k]; if (c) o[k] = Math.min(30, st.P[k], c.n | 0 || 1); } return o; };
   // 時刻の順に、確かめる（getRec：drec を読む関数）
@@ -90,9 +120,10 @@
       for (let j = 0; j < need.length; j += 24) await Promise.all(need.slice(j, j + 24).map(d => getRec(d.id).then(x => { d._got = 1; if (x && typeof x === 'object') { d.r = x.r; d.c = x.c; d.k = x.k; } }).catch(() => miss.add(d.id))));
       if (miss.size) { const cut = part.findIndex(d => miss.has(d.id)); part = part.slice(0, cut); if (!part.length) break; }
       const present = V.presentOf(st, raw);
-      const res = opt.run ? await opt.run(lv, part, present, st.bad, 120 * 60 * 20) : V.verifyDeaths(lv, part, present, st.bad, 120 * 60 * 20);
+      const res = opt.run ? await opt.run(lv, part, present, st.bad, 120 * 60 * 20, st.W || []) : V.verifyDeaths(lv, part, present, st.bad, 120 * 60 * 20, st.W || []);
       if (!res || !(res.done >= 0)) break;
       for (const u in res.badInc) st.bad[u] = (st.bad[u] || 0) + res.badInc[u];
+      if (Array.isArray(res.wait)) st.W = res.wait;
       // 確かめた鉛筆の数と、それぞれの輝き（S：場所ごとに、下から順の輝きの文字列。0〜8）
       st.S = st.S || {};
       res.add.forEach((p, j) => { st.P[p] = (st.P[p] || 0) + 1; st.S[p] = ((st.S[p] || '') + ((res.addS && res.addS[j]) | 0).toString(36)).slice(0, 30); });

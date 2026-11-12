@@ -147,7 +147,7 @@
   N.inWorker = inWorker;
   const plainLv = lv => ({ f: lv.f, w: lv.w, h: lv.h, tiles: lv.tiles, cap: lv.cap, start: lv.start, goal: lv.goal, ents: lv.ents });
   N.plainLv = plainLv;
-  const runDeaths = (lv, items, present, bad, budget) => inWorker('deaths', { lv: plainLv(lv), items: items.map(d => ({ id: d.id, p: d.p, u: d.u, t: d.t, r: d.r, c: d.c, k: d.k })), present, bad, budget }, () => V.verifyDeaths(lv, items, present, bad, budget));
+  const runDeaths = (lv, items, present, bad, budget, wait) => inWorker('deaths', { lv: plainLv(lv), items: items.map(d => ({ id: d.id, p: d.p, u: d.u, t: d.t, r: d.r, c: d.c, k: d.k, s: d.s | 0 })), present, bad, budget, wait: wait || [] }, () => V.verifyDeaths(lv, items, present, bad, budget, wait));
   N.verifyClearAsync = (lv, c, present, raw) => inWorker('clear', { lv: plainLv(lv), c: { t: c.t, r: c.r, c: c.c, k: c.k }, present, raw: raw ? V.dbOf(raw) : null }, () => V.verifyClear(lv, c, present, raw));
   async function floorState(lv) {
     const f = lv.f;
@@ -228,7 +228,7 @@
         if (u === uid) { Q.splice(Q.indexOf(e), 1); e.res(true); } else e.g = null;
       }
       if (!Q.length) return;
-      for (const e of Q) { if (batch.length >= 6) break; const key = e.f + ':' + e.k; if (e.k >= 0 && seen.has(key)) continue; seen.add(key); batch.push(e); }
+      for (const e of Q) { if (batch.length >= 6) break; const key = e.f + ':' + e.k; if (e.k >= 0 && seen.has(key)) break; seen.add(key); batch.push(e); }   // 同じ場所の2本目が来たら、そこで区切る（飛ばして後ろを先に送ると、届く順番が入れかわる）
       const w = { ['u/' + uid + '/c']: SV }, per = {};
       for (const e of batch) {
         per[e.f] = per[e.f] || { d: 0, m: 0 }; per[e.f].d++; per[e.f].m = Math.max(per[e.f].m, e.m | 0);
