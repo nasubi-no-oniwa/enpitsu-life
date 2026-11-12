@@ -27,8 +27,8 @@ const add = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
   const raw = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/levels.json')))[F - 1];
   const lv = FT.makeLevel(raw), olv = OFT.makeLevel(raw);
   const cells = (await rest('cells/' + F)) || {};
-  const items = V.newItems(V.newState(), await rest('dlog/' + F));
-  for (let j = 0; j < items.length; j += 24) await Promise.all(items.slice(j, j + 24).map(d => rest('drec/' + F + '/' + d.id).then(x => { if (x && typeof x === 'object') { d.r = x.r; d.c = x.c; d.k = x.k; } }).catch(() => { })));
+  const dlogRaw = await rest('dlog/' + F), drecRaw = {}; const items = V.newItems(V.newState(), dlogRaw);
+  for (let j = 0; j < items.length; j += 24) await Promise.all(items.slice(j, j + 24).map(d => rest('drec/' + F + '/' + d.id).then(x => { if (x && typeof x === 'object') { drecRaw[d.id] = x; d.r = x.r; d.c = x.c; d.k = x.k; } }).catch(() => { })));
   console.log(`第${F}層 記録 ${items.length}件　データベースの山 ${Object.keys(cells).length}`);
   const present = {}, bad = {}, cnt = {}, keyRes = {}, snapWhy = {}, rep = [], t0 = items.length ? items[0].t : 0, buckets = {};
   const users = new Set(items.map(d => d.u));
@@ -72,6 +72,8 @@ const add = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
   // 越えた記録：確かめ済みの鉛筆だけで再生して鉛筆立てに入るか。入らないとき、その人に見えていた鉛筆のままなら入るか
   const clears = Object.entries((await rest('clear/' + F)) || {}).map(([id, c]) => Object.assign({ id }, c)).filter(c => c && typeof c.t === 'number').sort((a, b) => a.t - b.t);
   const op = await rest('open/' + F).catch(() => null);
+  // 手元で細かく調べるために、この層のデータをまとめてログに出す（圧縮して小分け）
+  { const z = require('zlib').gzipSync(JSON.stringify({ F, cells, dlog: dlogRaw, drec: drecRaw, clear: (await rest('clear/' + F)) || {}, open: op })).toString('base64'); for (let i = 0; i < z.length; i += 6000) console.log('RAWGZ:' + z.slice(i, i + 6000)); }
   console.log(`越えた記録 ${clears.length}件　開いた印 ${op ? new Date(op.t).toISOString() + ' ' + op.n + ' ' + op.id : 'なし'}`);
   for (const c of clears.slice(0, 12)) {
     const snap = FT.corParse(c.c || ''), ts = V.trustSnap(lv, snap, present), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
