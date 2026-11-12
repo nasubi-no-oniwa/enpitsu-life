@@ -53,6 +53,7 @@ const add = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
         if (need > q) { const h = keyRes[k] || []; const why = !h.length ? 'その山の記録がない' : !h.some(x => x.res === 'ok') ? 'その山の記録がぜんぶだめ(' + [...new Set(h.map(x => x.res))].join(',') + ')' : '本数が足りない(' + q + '/' + need + ')'; add(snapWhy, why + (h.some(x => x.u === it.u && x.res !== 'ok') ? '・自分の鉛筆' : '')); break; }
       }
     }
+    if (res === 'snap' && !global._dsnap && (it.k | 0) > 300) { global._dsnap = 1; console.log('DUMPSNAP:' + JSON.stringify({ p: it.p, k: it.k, r: it.r, c: it.c, t: it.t })); }
     if ((res === 'replay' || res === 'old') && rep.length < 400) {
       const r = FT.replay(lv, snap, it.r, (it.k | 0) + 2);
       let o = null; try { const or = OFT.replay(olv, snap, it.r, (it.k | 0) + 2); o = or.place ? String(or.place.k) : 'なし'; } catch (e) { o = 'err'; }
@@ -79,6 +80,7 @@ const add = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
     let tot = 0, tr = 0; for (const [, x] of snap) tot += x.n; for (const [, x] of ts.m) tr += x.n;
     // 足りなかった山（確かめ済みより多く見えていた所）
     const short = []; for (const [k, x] of snap) { const q = present[k] || 0, cap = FT.capOf(lv, k); if (!FT.keyOk(lv, k)) short.push(k + ':はみ出し'); else if (Math.min(x.n, cap) > q) short.push(k + ':' + q + '/' + Math.min(x.n, cap) + (x.n > cap ? '(線こえ' + x.n + ')' : '')); }
+    if (c.id === (op && op.id)) console.log('DUMPOP:' + JSON.stringify({ id: c.id, n: c.n, t: c.t, k: c.k, r: c.r, c: c.c }));
     if ((a1.clear || a2.clear) && !global._dumped) { global._dumped = 1; console.log('DUMP:' + JSON.stringify({ id: c.id, n: c.n, t: c.t, k: c.k, r: c.r, c: c.c, trusted: a1.clear })); }
     console.log(`  ${new Date(c.t).toISOString()} ${c.id === (op && op.id) ? '★' : ' '} 「${c.n}」 確かめ済みだけ:${a1.clear ? '入る' : '入らない(' + (a1.dead || (a1.over ? 'end' : 'time')) + ' x=' + a1.p.x.toFixed(1) + ')'}　見えていたまま:${a2.clear ? '入る' : '入らない'}　前の動き:${o3}　鉛筆 ${tr}/${tot}本　足りない山 ${short.length}：${short.slice(0, 8).join(' ')}`);
   }
