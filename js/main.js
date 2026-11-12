@@ -5,7 +5,7 @@
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '16';
+  FT.VER = '17';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -81,7 +81,13 @@
   //  画面の切りかえ
   // =============================================
   const scr = id => { for (const s of document.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id); $('hud').classList.toggle('on', id === 'game'); $('hFront').classList.toggle('on', id === 'game'); };
-  const ov = (id, on) => $(id).classList.toggle('on', !!on);
+  const ov = (id, on) => { const e = $(id); if (on && !e.classList.contains('on')) e.dataset.at = Date.now(); e.classList.toggle('on', !!on); };
+  // 画面が出てすぐ（0.5秒）は、ボタンを押せないようにする（連打の指が「タイトル」などに当たって戻されないように）
+  document.addEventListener('click', ev => { const b = ev.target && ev.target.closest && ev.target.closest('.ov.on button'); if (!b) return; const o = b.closest('.ov'); if (Date.now() - (+o.dataset.at || 0) < 500) { ev.preventDefault(); ev.stopImmediatePropagation(); } }, true);
+  // iPhoneが裏でページを閉じて読みこみ直したときは、さっきまでいた層から続ける（20分以内）
+  const RESUME_MS = 20 * 60000;
+  const setResume = f => N.store('el_resume', f ? { f, t: Date.now() } : 0);
+  const getResume = () => { const r = N.store('el_resume'); return r && r.f >= 1 && r.f <= 100 && Date.now() - r.t < RESUME_MS ? r.f : 0; };
   const anyOv = () => !!document.querySelector('.ov.on');
   let toastT = 0;
   function toast(a, b, ms) { const e = $('toast'); e.innerHTML = esc(a) + (b ? `<small>${esc(b)}</small>` : ''); e.classList.add('in'); clearTimeout(toastT); toastT = setTimeout(() => e.classList.remove('in'), ms || 2200); }
@@ -129,7 +135,7 @@
     if (!LEVELS) return;
     f = Math.max(1, Math.min(W.latest, f | 0));
     S.loading = true;
-    const lv = getLevel(f); S.lv = lv;
+    const lv = getLevel(f); S.lv = lv; setResume(f);
     S.cor = new Map(); S.mine = new Map();
     for (const ov2 of document.querySelectorAll('.ov')) ov2.classList.remove('on');
     scr('game'); hud(); hint(T('よみこみ中…'));
@@ -146,7 +152,7 @@
     S.run = new FT.Run(lv, S.startCor); S.rec = new FT.Rec(); S.name = newName(); S.start = FT.corStr(S.startCor);
     S.acc = 0; S.aim = null; S.steer = 0; S.deadInfo = null; S.life++;
     const p = S.run.p; S.cam.x = p.x + 3; S.cam.y = p.y - 2; S.cam.z = 13;
-    S.mode = 'play'; S.paused = false;
+    S.mode = 'play'; S.paused = false; setResume(lv.f);
     hud();
     hint(ME.how < 2 ? T('指を引っぱって、はなすと飛ぶ') : '');
   }
@@ -649,6 +655,7 @@
   }
   setInterval(checkVer, 60000);
   function toTitle() {
+    setResume(0);
     if (verNew) { N.flush().catch(() => { }).finally(() => location.reload()); return; }
     for (const o of document.querySelectorAll('.ov')) o.classList.remove('on');
     $('specBar').classList.remove('on'); $('watchBar').classList.remove('on'); document.body.classList.remove('view');
@@ -1010,7 +1017,7 @@
   window.addEventListener('pagehide', () => N.flush().catch(() => { }));
   i18nAll(); paintTitle();
   requestAnimationFrame(loop);
-  fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; const sd = specFromHash(); if (sd) startSpec(sd); return refreshWorld(); }).then(() => { paintTitle(); loadLive(true); if (S.mode === 'spec') specHud(); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
+  fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; const sd = specFromHash(); if (sd) { setResume(0); startSpec(sd); } return refreshWorld(); }).then(() => { const rf = S.mode === 'title' ? getResume() : 0; if (rf) { enterFloor(rf).then(() => toast(T('さっきの層から続けます'), '', 2500)).catch(() => { }); } paintTitle(); loadLive(true); if (S.mode === 'spec') specHud(); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
   if (!OFFLINE) N.warm();
   // 管理画面などから使う
   FT.APP = { S, W, ME, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper, paintTitle, hud,
