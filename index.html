@@ -183,6 +183,9 @@ var qd=0;function q(){if(qd)return;qd=1;var f=function(){qd=0;tick();};try{reque
 function go(){place();try{new MutationObserver(function(){place();q();}).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden']});}catch(_){}setInterval(tick,300);tick();}
 if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
 }catch(e){}})();</script>
+<!-- nasubi-next: 結果画面に「次のゲーム」を出す（右にスライドするか押すと、おすすめの画面。中身は nasubi-no-oniwa.github.io/next/next.js で全作品共通） -->
+<script>window.NSB_NEXT={"g": "enpitsu-life", "r": [{"a": "#oDead .card", "v": "#oDead"}, {"a": "#oClear .card", "v": "#oClear"}], "ad": 1};</script>
+<script src="https://nasubi-no-oniwa.github.io/next/next.js" defer></script>
 </head>
 <body>
 <canvas id="c"></canvas>
