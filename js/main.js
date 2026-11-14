@@ -12,7 +12,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '19';
+  FT.VER = '20';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -289,6 +289,8 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
   //  飛んでいるとき：画面の左半分・右半分を押すと、ほんの少し左右に動く
   const ptr = new Map();
   let aimId = null;
+  let lastAct = Date.now();
+  for (const ev of ['pointerdown', 'pointermove', 'keydown']) window.addEventListener(ev, () => { lastAct = Date.now(); }, { passive: true, capture: true });
   const aimFrom = (sx, sy, ex, ey) => {
     const dx = sx - ex, dy = sy - ey, len = Math.hypot(dx, dy), unit = Math.min(VW, VH) * 0.36;
     if (len < 14) return null;
@@ -380,6 +382,8 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
     requestAnimationFrame(loop);
     if (S.pv) return;
     const dt = Math.min(0.1, (now - (S.last || now)) / 1000); S.last = now;
+    // 3分さわらなかったら、ひと休みにする（置きっぱなしで1回の挑戦が何十分にもなると、その鉛筆を確かめられなくなる）
+    if (S.mode === 'play' && !S.paused && !anyOv() && Date.now() - lastAct > 180000) { lastAct = Date.now(); openMenu(); }
     if (S.mode === 'play' && !S.paused && !anyOv()) {
       S.acc += dt;
       while (S.acc >= FT.DT) { S.acc -= FT.DT; tick(); if (S.mode !== 'play') break; }
@@ -925,7 +929,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
     toast(T('記録を読んでいます…'), '', 2500);
     let c = null; try { c = await N.rest('clear/' + f + '/' + o.id); } catch (e) { c = null; }
     if (!c || typeof c.r !== 'string') { toast(T('記録が読めませんでした')); return; }
-    const lv = getLevel(f), view = FT.corParse(c.c || ''), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
+    const lv = getLevel(f), view = FT.corParse(c.c || ''), lim = Math.min(FT.V.CMAX, (c.k | 0) + 2);
     let use = view;
     if (!FT.replay(lv, view, c.r, lim, r => r.clear).clear) {
       // 見えていた鉛筆のままでは同じにならないとき：確かめ済みの鉛筆だけで（まとめの確かめと同じ形）
@@ -1029,5 +1033,5 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
   // 管理画面などから使う
   FT.APP = { S, W, ME, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper, paintTitle, hud,
     // 試験用：越えた記録を、読みこまずにそのまま再生する
-    watchRec: (f, c, name) => { const view = FT.corParse(c.c || ''); Object.assign(WT, { c, f, name: name || '', view, use: view, gos: parseGos(c.r), lim: Math.min(120 * 60 * 10, (c.k | 0) + 2) }); startWatch(); } };
+    watchRec: (f, c, name) => { const view = FT.corParse(c.c || ''); Object.assign(WT, { c, f, name: name || '', view, use: view, gos: parseGos(c.r), lim: Math.min(FT.V.CMAX, (c.k | 0) + 2) }); startWatch(); } };
 })(window);

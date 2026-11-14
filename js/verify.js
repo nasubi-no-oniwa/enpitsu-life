@@ -7,7 +7,10 @@
 (function (G) {
   const FT = G.FT;
   const V = FT.V = {};
-  V.DMAX = 120 * 60 * 6;   // 1つの挑戦を再生する長さの上限（6分）
+  // 1つの挑戦を再生する長さの上限（60分）
+  //  前は6分だった。足場の上で長く考えた人の鉛筆が数えられず、その鉛筆を足場にした人の記録までつられて数えられなかった（第55層）
+  V.DMAX = 120 * 60 * 60;
+  V.CMAX = 120 * 60 * 60;   // 越えた記録の上限（前は10分）
   // 始まりの鉛筆が、確かめた鉛筆の中にあるか（present：{ 場所: 本数 }）
   //  赤い線より上の分は数えない（同時に積まれて、端末にはそれより多く見えていたことがあるため）
   function snapOk(snap, present, lv) {
@@ -96,7 +99,7 @@
   //  （確かめ済みの鉛筆だけにすると、ほかの人の記録のずれにつられて、正しく越えた記録まで通らず、次の層が開かないことがあった）
   V.verifyClear = function (lv, c, present, raw) {
     if (!c || typeof c.r !== 'string' || typeof c.c !== 'string' || typeof c.t !== 'number' || !(c.k >= 1)) return false;
-    const snap = FT.corParse(c.c), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
+    const snap = FT.corParse(c.c), lim = Math.min(V.CMAX, (c.k | 0) + 2);
     if (FT.replay(lv, V.trustSnap(lv, snap, present).m, c.r, lim, q => q.clear).clear) return true;
     return !!raw && FT.replay(lv, V.trustSnap(lv, snap, V.dbOf(raw)).m, c.r, lim, q => q.clear).clear;
   };

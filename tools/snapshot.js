@@ -21,7 +21,8 @@ const T0 = Date.now(), LIMIT = +(process.env.EL_SNAP_MS || 8 * 60 * 1000);
 // 6：操作の記録の読みまちがい（角度に g・強さに p が入るとき）を直して、ぜんぶ確かめなおす
 // 7：確かめ方を変えたときは、一番乗りも確かめなおす（6で、本当の一番乗りが前のまま別の人になっていた）
 // 8：届く順番が入れかわった記録を、足場が確かめられたあとで確かめなおす
-const SVER = 8;
+// 9：1回の挑戦の長さの上限を6分から60分へ（長く考えた人の鉛筆も数える）
+const SVER = 9;
 async function rest(p, q) {
   const qs = Object.entries(q || {}).map(([k, v]) => k + '=' + encodeURIComponent(/^(limitTo|shallow)/.test(k) ? String(v) : JSON.stringify(v)));
   if (CFG.ns) qs.push('ns=' + CFG.ns);

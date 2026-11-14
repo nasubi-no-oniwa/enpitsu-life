@@ -337,7 +337,7 @@
     // 鉛筆の確かめが終わるのを待たない（越えた記録は、データベースにある鉛筆でも確かめられるので）
     const F = lv._F, rs = F ? F.rmKey : '', done = !N.more(lv);
     const sv = (F && F.sv) | 0, vc = VC(); let cur = vc[f] && vc[f].rs === rs && (vc[f].sv | 0) === sv ? vc[f].t : 0;
-    let budget = 120 * 60 * 120;
+    let budget = 120 * 60 * 240;
     const present = N.present(lv);
     for (let page = 0; page < 30; page++) {
       const v = await rest('clear/' + f, { orderBy: 't', startAt: cur + 1, limitToFirst: 10 });
@@ -345,7 +345,7 @@
       if (!list.length) break;
       for (const c of list) {
         if (budget <= 0) return { wait: true };
-        budget -= Math.min(120 * 60 * 10, Math.max(1, c.k | 0));
+        budget -= Math.min(V.CMAX, Math.max(1, c.k | 0));
         if (await N.verifyClearAsync(lv, c, present, F && F.raw)) return c;
         cur = c.t; if (done) { const o = VC(); o[f] = { t: cur, rs, sv }; store('el_vc3', o); }   // 確かめが終わっていないときは、あとでもう一度見る
       }

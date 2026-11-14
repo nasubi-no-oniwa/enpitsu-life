@@ -76,7 +76,7 @@ const add = (o, k, n = 1) => { o[k] = (o[k] || 0) + n; };
   { const z = require('zlib').gzipSync(JSON.stringify({ F, cells, dlog: dlogRaw, drec: drecRaw, clear: (await rest('clear/' + F)) || {}, open: op })).toString('base64'); for (let i = 0; i < z.length; i += 6000) console.log('RAWGZ:' + z.slice(i, i + 6000)); }
   console.log(`越えた記録 ${clears.length}件　開いた印 ${op ? new Date(op.t).toISOString() + ' ' + op.n + ' ' + op.id : 'なし'}`);
   for (const c of clears.slice(0, 12)) {
-    const snap = FT.corParse(c.c || ''), ts = V.trustSnap(lv, snap, present), lim = Math.min(120 * 60 * 10, (c.k | 0) + 2);
+    const snap = FT.corParse(c.c || ''), ts = V.trustSnap(lv, snap, present), lim = Math.min(V.CMAX, (c.k | 0) + 2);
     const a1 = FT.replay(lv, ts.m, c.r, lim), a2 = FT.replay(lv, snap, c.r, lim);
     let o3 = null; try { const or = OFT.replay(olv, snap, c.r, lim); o3 = or.clear ? '入る' : '入らない'; } catch (e) { o3 = 'err'; }
     let tot = 0, tr = 0; for (const [, x] of snap) tot += x.n; for (const [, x] of ts.m) tr += x.n;
