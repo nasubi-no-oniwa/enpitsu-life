@@ -12,7 +12,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '20';
+  FT.VER = '21';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -115,7 +115,9 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
     const box = $('langs'); box.innerHTML = '';
     for (const [k, name] of FT.LANGS) { const b = document.createElement('button'); b.textContent = name; b.className = k === FT.LANG ? 'on' : ''; b.onclick = () => FT.setLang(k); box.appendChild(b); }
   }
-  function paintSnd() { const t = SND.on ? T('♪ 音あり') : T('♪ 音なし'); $('bSnd').textContent = t; $('mSnd').textContent = t; }
+  function paintSnd() { const t = SND.on ? T('♪ 音あり') : T('♪ 音なし'); $('bSnd').textContent = t; $('mSnd').textContent = t; paintShine(); }
+  // 鉛筆の輝きを出す・出さない（この端末だけ。まぶしくて足場が見にくいとき用）
+  function paintShine() { const t = ME.noShine ? T('✨ 輝きなし') : T('✨ 輝きあり'); $('bShine').textContent = t; $('mShine').textContent = t; }
   // 配信中の人
   let liveAt = 0, liveList = [];
   async function loadLive(force) {
@@ -520,7 +522,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
     }
     // 飛んだあとの線
     if (r && S.trail.length > 1 && (r.p.fly || S.mode !== 'play')) {
-      if (S.mode === 'play' && myShine() >= 4) {
+      if (S.mode === 'play' && myShine() >= 4 && !ME.noShine) {
         // 虹の軌跡（4段から）
         g.lineWidth = Math.max(2, s * .12); g.lineCap = 'round';
         for (let i = 1; i < S.trail.length; i++) { g.strokeStyle = `hsla(${(i * 14 + t * 160) % 360},90%,62%,${.25 + .6 * i / S.trail.length})`; g.beginPath(); g.moveTo(X(S.trail[i - 1][0]), Y(S.trail[i - 1][1])); g.lineTo(X(S.trail[i][0]), Y(S.trail[i][1])); g.stroke(); }
@@ -541,7 +543,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
   // 鉛筆1本（下のはしを x, y に置く。ang：傾き。me：自分）
   function drawPencil(g, x, y, s, seed, ang, alpha, ink, me, fly, tier) {
     const w = s * .34, h = s * PH.PH, cols = ['#f5c84c', '#4f9be0', '#e65f4f', '#5cbf6a', '#b07cd8', '#ff9f43', '#ff8fab', '#7ad0c4'];
-    tier = tier | 0;
+    tier = ME.noShine ? 0 : tier | 0;   // 輝きを切っているときは、ふつうの鉛筆として描く（見やすさのため）
     const tt = S.pv && S.pvT !== undefined ? S.pvT : performance.now() / 1000;   // PVを作るときは、こまの時刻で動かす
     let col = me ? '#f5c84c' : cols[Math.floor(hash(seed, 3) * cols.length)];
     g.save(); g.globalAlpha = alpha; g.translate(x, y); g.rotate(ang);
@@ -680,6 +682,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
   $('bBoard').onclick = () => openBoard();
   $('bHow').onclick = () => openHow();
   $('bSnd').onclick = $('mSnd').onclick = () => { SND.unlock(); SND.setOn(!SND.on); paintSnd(); };
+  $('bShine').onclick = $('mShine').onclick = () => { ME.noShine = ME.noShine ? 0 : 1; saveMe(); paintShine(); };
   $('hMenu').onclick = () => openMenu();
   $('hLive').onclick = () => { if (liveList[0]) window.open(liveList[0].u, '_blank', 'noopener'); };
   $('mResume').onclick = () => { ov('oMenu', 0); S.paused = false; };
