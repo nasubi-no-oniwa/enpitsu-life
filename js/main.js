@@ -12,7 +12,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '21';
+  FT.VER = '22';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -143,6 +143,8 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
   async function enterFloor(f) {
     if (!LEVELS) return;
     f = Math.max(1, Math.min(W.latest, f | 0));
+    // 新しい版が出ていたら、層に入る前に読みこみ直す（古い版のまま、作りなおした層に入らないように）。読みこみ直したあと、この層から続く
+    if (verNew && !OFFLINE) { setResume(f); N.flush().catch(() => { }).finally(() => location.reload()); return; }
     S.loading = true;
     const lv = getLevel(f); S.lv = lv; setResume(f);
     S.cor = new Map(); S.mine = new Map();

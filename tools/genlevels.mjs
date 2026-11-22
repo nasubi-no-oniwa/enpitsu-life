@@ -3,6 +3,7 @@
 //   ・部品（平ら・段差・壁・のり・トゲ・天井・紙ひこうき・鉛筆けずり・扇風機・消しゴム）を、層が上がるほど難しく組み合わせる
 //   ・作った層は、越えられるかを計算で確かめる（tools/solver.mjs）。越えられない層は作りなおす
 //   ・できた層は data/levels.json に書く（すでにある層は、指定した範囲だけ書きかえる）
+//   ・EASY_FROM=78 のようにすると、その層から上は「短く・やさしく」作る（終わりへ向かうため。2026-11-23：第78層から上をやさしくした）
 // =============================================
 import fs from 'fs';
 import { makeSolver } from './solver.mjs';
@@ -10,13 +11,16 @@ const G = globalThis; eval(fs.readFileSync(new URL('../js/engine.js', import.met
 const FT = G.FT, T = FT.T, S = makeSolver(FT);
 const OUT = process.env.OUT ? new URL('file://' + process.env.OUT) : new URL('../data/levels.json', import.meta.url);
 const H = 24, GY = 18;
+const EASY_FROM = +(process.env.EASY_FROM || 999);
 export const THEMES = ['ノートのすみっこ', '方眼紙の原っぱ', '黒板のがけ', 'テスト用紙の谷', '絵の具のぬま', '習字の半紙', '図工室の工場', '夜の教室', '受験の塔', '卒業の空'];
 // 決まった乱数（層の番号とためし番号から）
 function rng(seed) { let s = seed >>> 0 || 1; return () => { s ^= s << 13; s >>>= 0; s ^= s >> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
 function build(f, tryN) {
   const R = rng(f * 7919 + tryN * 104729 + 13), ri = (a, b) => a + Math.floor(R() * (b - a + 1)), pick = a => a[Math.floor(R() * a.length)];
-  const d = (f - 1) / 99;
-  const W = Math.round(70 + f * 3.4 + ri(0, 10));
+  const easy = f >= EASY_FROM;
+  // やさしい層：はじめのころの難しさ・短い幅・低い壁
+  const d = easy ? 0.12 : (f - 1) / 99;
+  const W = easy ? Math.round(84 + (f - EASY_FROM) * 0.5 + ri(0, 10)) : Math.round(70 + f * 3.4 + ri(0, 10));
   const tiles = new Uint8Array(W * H), cap = new Int8Array(W).fill(2), ents = [];
   const set = (x, y, v) => { if (x >= 0 && x < W && y >= 0 && y < H) tiles[y * W + x] = v; };
   const fillCol = (x, top, v) => { for (let y = top; y < H; y++) set(x, y, v); };
@@ -37,7 +41,8 @@ function build(f, tryN) {
   if (f >= 20) parts.push('sharp');
   if (f >= 25) parts.push('fan');
   if (f >= 35) parts.push('eraser');
-  if (f >= 50) parts.push('wall', 'glue');
+  if (f >= 50 && !easy) parts.push('wall', 'glue');
+  if (easy) parts.push('flat', 'flat', 'step');   // 平らな所と段差を多めに
   let last = '';
   while (x < W - goalW - 4) {
     let k = pick(parts); if (k === last && k !== 'flat') k = 'flat'; last = k;
@@ -51,7 +56,7 @@ function build(f, tryN) {
       for (let i = 0; i < n && x < W - goalW - 3; i++, x++) { fillCol(x, g, T.BLOCK); if (k === 'glue') set(x, g, T.GLUE); else { set(x, g - 1, T.SPIKE); } cap[x] = 0; }
       flat(ri(2, 3));
     } else if (k === 'wall') {
-      const hw = ri(6 + Math.round(d * 3), 8 + Math.round(d * 7)), th = ri(1, 2);
+      const hw = easy ? ri(4, 6) : ri(6 + Math.round(d * 3), 8 + Math.round(d * 7)), th = ri(1, 2);
       // 壁の前は、積める本数を多めにする（壁の上まで届くように）
       const needN = Math.max(2, Math.ceil((hw - 3.2) / FT.PHYS.PH) + 1);
       flat(1); cap[x - 1] = needN; if (x >= 2) cap[x - 2] = Math.max(cap[x - 2], Math.ceil(needN / 2));
@@ -87,7 +92,7 @@ function build(f, tryN) {
 const from = +(process.argv[2] || 1), to = +(process.argv[3] || 100);
 const all = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, 'utf8')) : [];
 // 必要な鉛筆の数の目安（層が上がるほど多く）。少なすぎる・多すぎる層は作りなおす
-const want = f => [Math.round(9 + f * 0.9), Math.round(30 + f * 3)];
+const want = f => f >= EASY_FROM ? [8, 16] : [Math.round(9 + f * 0.9), Math.round(30 + f * 3)];
 for (let f = from; f <= to; f++) {
   let best = null;
   for (let tryN = 0; tryN < 5; tryN++) {
@@ -96,7 +101,7 @@ for (let f = from; f <= to; f++) {
     const [lo, hi] = want(f);
     const line = `第${f}層 ためし${tryN}：幅${r.w} ${res.ok ? '越えられる' : '越えられない(' + res.why + ' ' + res.far.toFixed(0) + ')'} 必要な鉛筆 ${res.need}（目安 ${lo}〜${hi}） ${res.ms}ms`;
     console.log(line);
-    if (res.ok) { r.need = res.need; r.sol = res.log.map(a => a.slice(0, 2)); if (res.need >= lo && res.need <= hi) { best = r; break; } if (!best || Math.abs(res.need - (lo + hi) / 2) < Math.abs(best.need - (lo + hi) / 2)) best = r; }
+    if (res.ok) { r.need = res.need; if (res.need >= lo && res.need <= hi) { best = r; break; } if (!best || Math.abs(res.need - (lo + hi) / 2) < Math.abs(best.need - (lo + hi) / 2)) best = r; }
   }
   if (!best) { console.log(`第${f}層：越えられる形が作れませんでした`); process.exitCode = 1; continue; }
   all[f - 1] = best;
