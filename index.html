@@ -131,6 +131,46 @@ input[type=text]{width:100%;font:inherit;font-size:16px;padding:9px 10px;border:
 .spin{display:inline-block;width:16px;height:16px;border:3px solid var(--ink);border-right-color:transparent;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px}
 @keyframes sp{to{transform:rotate(360deg)}}
 video{width:100%;border:2px solid var(--ink);border-radius:10px;background:#000;display:block}
+
+/* エンドロール */
+#ending{position:fixed;inset:0;z-index:40;display:none;overflow:hidden;background:var(--paper);background-image:repeating-linear-gradient(transparent 0 31px,var(--line) 31px 32px);transition:background-color .8s}
+#ending.on{display:block}
+#ending.see{background:transparent;background-image:none;pointer-events:none}
+#ending.see #endRollW,#ending.see #endCard,#ending.see #endTy{opacity:0}
+#ending.see #endSkip{pointer-events:auto}
+#endCv{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#endRollW{position:absolute;inset:0;overflow:hidden;pointer-events:none;-webkit-mask-image:linear-gradient(to top,transparent 0,transparent 30%,#000 42%);mask-image:linear-gradient(to top,transparent 0,transparent 30%,#000 42%)}
+#endRoll{position:absolute;left:0;right:0;top:0;text-align:center;font-weight:900;font-size:18px;line-height:1.6;padding:0 18px;will-change:transform;text-shadow:0 0 4px var(--paper),0 0 2px var(--paper);transition:opacity .6s}
+#endRoll .e-num{margin:0 0 46px;font-size:16px}
+#endRoll .e-num b{display:block;font-family:'Yomogi',cursive;font-size:clamp(34px,10vw,52px);color:var(--red);line-height:1.25}
+#endRoll h3{font-family:'Yomogi',cursive;font-size:28px;margin:52px 0 26px;letter-spacing:.12em}
+#endRoll .e-fl{margin:0 0 20px}
+#endRoll .e-fl small{display:block;font-size:12px;font-weight:500;opacity:.75}
+#endRoll .e-fl em{font-style:normal;color:var(--red);margin-left:6px}
+#endRoll .ex{font-size:12px;opacity:.7}
+#endRoll .dim{opacity:.35}
+#endCard{position:absolute;left:0;right:0;top:0;bottom:34%;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 18px;pointer-events:none;transition:opacity .6s}
+#endCard .ec{background:rgba(255,253,246,.92);border:3px solid var(--ink);border-radius:18px 12px 16px 10px;padding:18px 22px;box-shadow:4px 4px 0 rgba(0,0,0,.18);max-width:420px}
+#endCard .ec.in{animation:ecIn 1s ease-out both}#endCard .ec.out{animation:ecOut .7s ease-in both}
+@keyframes ecIn{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes ecOut{to{opacity:0;transform:translateY(-12px)}}
+#endCard p{margin:0}
+#endCard .ec-k{font-size:14px;font-weight:900;letter-spacing:.15em;opacity:.7}
+#endCard .ec-n{font-family:'Yomogi',cursive;font-size:clamp(28px,8vw,42px);line-height:1.3;margin:4px 0}
+#endCard .ec-t{font-size:14px;font-weight:900;margin-top:8px}
+#endCard .ec-s{font-size:14px;font-weight:500;line-height:1.6;margin-top:8px}
+#endCard .ec-me{display:flex;gap:14px;justify-content:center;margin-top:10px}
+#endCard .ec-me p{min-width:86px}#endCard .ec-me small{display:block;font-size:12px;opacity:.75}
+#endCard .ec-me b{display:block;font-family:'Yomogi',cursive;font-size:30px;color:var(--red);line-height:1.2}#endCard .ec-me b.sm{font-size:18px;line-height:1.7}
+#endCard .ec-me i{font-style:normal;font-size:12px}
+#endCap{position:absolute;left:0;right:0;top:calc(max(9px,env(safe-area-inset-top)) + 54px);text-align:center;opacity:0;transform:translateY(-8px);transition:opacity 1s,transform 1s;pointer-events:none;text-shadow:0 0 4px var(--paper),0 0 3px var(--paper)}
+#endCap.on{opacity:1;transform:none}
+#endCap small{display:block;font-size:13px;font-weight:900;letter-spacing:.15em}
+#endCap b{display:block;font-family:'Yomogi',cursive;font-size:clamp(26px,8vw,40px);line-height:1.3}
+#endTy{position:absolute;inset:0 0 34% 0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Yomogi',cursive;font-size:clamp(26px,8vw,50px);opacity:0;transition:opacity 3s;pointer-events:none;text-shadow:3px 3px 0 #ffd23f}
+#endTy.on{opacity:1}
+#endTy small{font-family:'Zen Maru Gothic',sans-serif;font-weight:900;font-size:15px;margin-top:10px;text-shadow:none}
+#endSkip{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:auto;padding:8px 16px;font-size:14px;z-index:2}
 </style>
 <script>(function(){try{var G="enpitsu-life",IDS=["oDead","oClear"];
 function ev(n){try{if(typeof gtag==='function')gtag('event',n,{game:G});}catch(e){}}
@@ -207,6 +247,7 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <div class="row"><button class="btn sub" id="bNote" data-t="一番乗りノート">一番乗りノート</button><button class="btn sub" id="bAsk" data-t="管理人への相談">管理人への相談</button></div>
  <div class="row"><button class="btn sub" id="bHow" data-t="あそびかた">あそびかた</button><button class="btn sub" id="bSnd">♪</button></div>
  <div class="row"><button class="btn sub" id="bShine">✨</button></div>
+ <button class="btn main" id="bEnd" hidden data-t="🎬 エンドロール">🎬 エンドロール</button>
  <div class="langs" id="langs"></div>
  <div class="foot"><span data-t="死は、だれかの足場になる。">死は、だれかの足場になる。</span><br><a href="https://nasubi-no-oniwa.github.io/" target="_blank" rel="noopener">なすびのお庭</a> ・ #エンピツライフ</div>
 </div></div>
@@ -231,6 +272,16 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <button class="btn sub" id="dTitleBtn" data-t="タイトル">タイトル</button>
 </div></div></div>
 
+
+<!-- エンドロール（卒業したとき） -->
+<div id="ending">
+ <canvas id="endCv"></canvas>
+ <div id="endCap"></div>
+ <div id="endRollW"><div id="endRoll"></div></div>
+ <div id="endCard"></div>
+ <div id="endTy">Thank you for playing<small>死は、だれかの足場になる。</small></div>
+ <button class="btn sub" id="endSkip">とばす</button>
+</div>
 <!-- 越えた -->
 <div class="ov" id="oClear"><div class="note"><div class="card">
  <h2 id="cTitle"></h2>
@@ -322,13 +373,13 @@ if(document.body)go();else document.addEventListener('DOMContentLoaded',go);
  <button class="btn sub" id="vClose" data-t="とじる">とじる</button>
 </div></div></div>
 
-<script src="js/i18n.js?v=22"></script>
-<script src="js/config.js?v=22"></script>
-<script src="js/engine.js?v=22"></script>
-<script src="js/verify.js?v=22"></script>
-<script src="js/net.js?v=22"></script>
-<script src="js/sound.js?v=22"></script>
-<script src="js/filter.js?v=22"></script>
-<script src="js/main.js?v=22"></script>
+<script src="js/i18n.js?v=23"></script>
+<script src="js/config.js?v=23"></script>
+<script src="js/engine.js?v=23"></script>
+<script src="js/verify.js?v=23"></script>
+<script src="js/net.js?v=23"></script>
+<script src="js/sound.js?v=23"></script>
+<script src="js/filter.js?v=23"></script>
+<script src="js/main.js?v=23"></script>
 </body>
 </html>

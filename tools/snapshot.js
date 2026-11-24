@@ -85,6 +85,8 @@ const obj = v => { const o = {}; if (v && typeof v === 'object') for (const k in
     idx.ok[f] = { t: o.t, ct: found.t, id: found.id, n: String(found.n || '名無し').slice(0, 12), w: found.id === o.id ? o.w : String(found.w || '').slice(0, 12), x: found.id === o.id ? o.x : String(found.x || '').slice(0, 15) };
   }
   let L = 1; while (L <= 100 && idx.ok[L]) L++; idx.vtop = Math.min(101, L);
+  // 層ごとの、足場になった鉛筆の数（エンドロール用）
+  idx.pc = {}; for (const f in states) { let n = 0; for (const k in (states[f].st && states[f].st.P) || {}) n += states[f].st.P[k] | 0; idx.pc[f] = n; }
   fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify(idx));
   // 卒業生：第100層を越えた記録を、古い順に再生して確かめ、本物だけ並べる（ノートの最後のページ）
   const gfile = path.join(OUT, 'grads.json'), G0 = readJ(gfile, { cur: 0, list: [] }), G = G0.ver === SVER ? G0 : { cur: 0, list: [], ver: SVER };

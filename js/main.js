@@ -12,7 +12,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
 (function (G) {
   const FT = G.FT, N = FT.NET, SND = FT.SND, TT = FT.T, PH = FT.PHYS;
   const T = (s, ...a) => FT.tr(s, ...a);
-  FT.VER = '22';
+  FT.VER = '23';
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmt = n => Number(n || 0).toLocaleString(FT.LOCALE || 'ja-JP');
@@ -111,7 +111,7 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
     $('tMine').textContent = T('{0}本', fmt(ME.dead));
     { const tr = myShine(), nx = SHINE[tr]; $('tShine').textContent = (tr ? T('鉛筆の輝き：{0}', T(SHINE_NAME[tr])) : T('鉛筆の輝き：まだなし')) + (nx ? ' ' + T('（あと{0}本で「{1}」）', fmt(nx - ME.dead), T(SHINE_NAME[tr + 1])) : ''); }
     $('tNote').textContent = OFFLINE ? T('いまは一人で遊んでいます（みんなの鉛筆は出ません）') : (W.end ? T('ゲームは終わりました。鉛筆はもう増えません') : T('鉛筆は20秒ごとに、みんなのものが届きます'));
-    paintSnd();
+    paintSnd(); paintEndBtn();
     const box = $('langs'); box.innerHTML = '';
     for (const [k, name] of FT.LANGS) { const b = document.createElement('button'); b.textContent = name; b.className = k === FT.LANG ? 'on' : ''; b.onclick = () => FT.setLang(k); box.appendChild(b); }
   }
@@ -247,7 +247,8 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
     $('cFirst').hidden = true; $('cNext').disabled = lv.f >= 100;
     $('cNext').textContent = lv.f >= 100 ? T('卒業！') : T('次の層へ');
     S.clearInfo = { f: lv.f, hops: r.p.hops - 1, id: null, opened: false };
-    setTimeout(() => ov('oClear', 1), 700);
+    if (lv.f >= 100) setTimeout(() => { playEnding().then(() => ov('oClear', 1)); }, 1600);   // 卒業：エンドロールのあとに結果の画面
+    else setTimeout(() => ov('oClear', 1), 700);
     if (OFFLINE) { W.okLocal[lv.f] = 1; N.store('el_okf', W.okLocal); computeLatest(); return; }
     try {
       const res = await N.clear(lv, { name: S.name, rec: S.rec.str(), cor: S.start, ticks: r.t });
@@ -1033,8 +1034,136 @@ function nqS(o){const q=quoteURL();if(!q||!o)return o;o=Object.assign({},o);o.te
   window.addEventListener('pagehide', () => N.flush().catch(() => { }));
   i18nAll(); paintTitle();
   requestAnimationFrame(loop);
-  fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; const sd = specFromHash(); if (sd) { setResume(0); startSpec(sd); } return refreshWorld(); }).then(() => { const rf = S.mode === 'title' ? getResume() : 0; if (rf) { enterFloor(rf).then(() => toast(T('さっきの層から続けます'), '', 2500)).catch(() => { }); } paintTitle(); loadLive(true); if (S.mode === 'spec') specHud(); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
+  fetch('data/levels.json?v=' + FT.VER).then(r => r.json()).then(v => { LEVELS = v; const sd = specFromHash(); if (sd) { setResume(0); startSpec(sd); } return refreshWorld(); }).then(() => { if (S.mode === 'title' && W.done && !ME.endSeen) setTimeout(() => { if (S.mode === 'title') playEnding().then(() => paintTitle()); }, 1200); const rf = S.mode === 'title' ? getResume() : 0; if (rf) { enterFloor(rf).then(() => toast(T('さっきの層から続けます'), '', 2500)).catch(() => { }); } paintTitle(); loadLive(true); if (S.mode === 'spec') specHud(); }).catch(() => toast(T('読みこめませんでした'), T('読みこみ直してください')));
   if (!OFFLINE) N.warm();
+
+  // =============================================
+  //  エンドロール（第100層を越えたとき・卒業のあとタイトルから。シインクラッドのエンドロールと同じ流れ）
+  //   1. 数字（かかった時間・倒れた回数・足場の鉛筆）→ 第1〜99層の一番乗りが流れる。流れるのに合わせて、その層で倒れた数だけ鉛筆が降って積もる
+  //   2. 第100層：一番乗りの本当の動きを再生する
+  //   3. 卒業生 → 4. あなたの記録 → Thank you for playing
+  // =============================================
+  const START_T = Date.parse('2026-11-11T17:00:00+09:00');   // 公開した日時
+  let endOn = null;
+  function playEnding(opt) {
+    if (endOn) return endOn;
+    opt = opt || {};
+    const box = $('ending'), roll = $('endRoll'), cv = $('endCv'), card = $('endCard'), cap = $('endCap'), ty = $('endTy');
+    roll.innerHTML = ''; roll.style.transform = ''; card.innerHTML = ''; cap.innerHTML = ''; cap.classList.remove('on'); ty.classList.remove('on'); box.classList.remove('see');
+    box.classList.add('on'); $('endSkip').textContent = T('とばす');
+    const was = { mode: S.mode, paused: S.paused }; S.paused = true;
+    SND.unlock(); SND.bgm(9);
+    endOn = new Promise(async done => {
+      let stop = false, raf = 0;
+      const finish = () => { if (stop) return; stop = true; cancelAnimationFrame(raf); box.classList.remove('on', 'see'); $('watchBar').classList.remove('on'); SND.bgm(null); S.paused = was.paused; endOn = null; ME.endSeen = 1; saveMe(); done(); };
+      $('endSkip').onclick = finish;
+      const wait = ms => new Promise(r => { const t0 = performance.now(); const k = () => { if (stop || performance.now() - t0 >= ms) r(); else setTimeout(k, 50); }; k(); });
+      // ---- 画面 ----
+      const D = Math.min(2, window.devicePixelRatio || 1), WW = Math.max(200, window.innerWidth), HH = Math.max(300, window.innerHeight);
+      cv.width = Math.round(WW * D); cv.height = Math.round(HH * D);
+      const g = cv.getContext('2d');
+      // 積もった鉛筆は別の絵に焼きつける（何百本あっても軽い）
+      const pile = document.createElement('canvas'); pile.width = cv.width; pile.height = cv.height; const pg = pile.getContext('2d'); pg.setTransform(D, 0, 0, D, 0, 0);
+      const ps = Math.max(18, Math.min(30, Math.round(WW / 16))), pw = ps * .4, C = Math.floor(WW / pw), ox = (WW - C * pw) / 2;
+      const ph = ps * PH.PH, rowsMax = Math.max(3, Math.floor(HH * 0.30 / ph)), hgt = new Int16Array(C);
+      const falling = [], queue = [], dust = []; let shake = 0, glow = 0, pileOn = 1, seedN = 1;
+      const drop = (big) => {
+        let col = -1, best = 1e9; for (let i = 0; i < 3; i++) { const c = Math.floor(Math.random() * C); if (hgt[c] < best) { best = hgt[c]; col = c; } }
+        if (col < 0 || hgt[col] >= rowsMax + 2) return;
+        const ty2 = HH - hgt[col] * ph; hgt[col]++;
+        falling.push({ x: ox + col * pw + pw / 2, y: -ps - Math.random() * (big ? 160 : 60), vy: big ? 420 : 80 + Math.random() * 120, ty: ty2, seed: seedN++, ang: (Math.random() - .5) * 2, big, tier: big ? 6 + Math.floor(Math.random() * 3) : (Math.random() < .12 ? 1 + Math.floor(Math.random() * 5) : 0) });
+      };
+      const land = b => { pg.save(); drawPencil(pg, b.x, b.ty, ps, b.seed, 0, 1, '#2b2b33', false, 0, 0); pg.restore(); for (let i = 0; i < 3; i++) dust.push({ x: b.x, y: b.ty, vx: (Math.random() - .5) * 80, vy: -Math.random() * 60, life: .5 }); if (b.big) shake = Math.max(shake, 6); };
+      // ---- 中身 ----
+      try { await refreshWorld(); } catch (e) { }
+      let idx = null; try { idx = await N.snapIndex(); } catch (e) { }
+      let grads = []; try { const G = await N.grads(); grads = (G && G.list) || []; } catch (e) { }
+      if (stop) return;
+      const dOf = f => (W.stat[f] && W.stat[f].d) || 0;
+      let Dsum = 0, hard = 2, hardD = -1; for (let f = 1; f <= 100; f++) { const d = dOf(f); Dsum += d; if (f >= 2 && d > hardD) { hardD = d; hard = f; } }   // 第1層は全員が通るので、難所からは外す
+      let pc = 0; if (idx && idx.pc) for (const k in idx.pc) pc += idx.pc[k] | 0;
+      const endT = (W.open[100] && W.open[100].t) || Date.now(), span = Math.max(0, endT - START_T), dd = Math.floor(span / 86400000), hh = Math.floor((span % 86400000) / 3600000);
+      const nm = o => o ? esc(nameOf(o)) + (o.x ? ` <small class="ex">@${esc(String(o.x).replace(/^@/, ''))}</small>` : '') : '<span class="dim">？？？</span>';
+      const lvName = f => LEVELS && LEVELS[f - 1] ? esc(T(LEVELS[f - 1].n)) : '';
+      let h = `<p class="e-num">${esc(T(W.done ? '公開から卒業まで' : '公開から'))}<b>${esc(T('{0}日{1}時間', dd, hh))}</b></p>`;
+      h += `<p class="e-num">${esc(T('みんなが倒れた回数'))}<b>${esc(T('{0}回', fmt(W.dead || Dsum)))}</b></p>`;
+      if (pc) h += `<p class="e-num">${esc(T('だれかの足場になった鉛筆'))}<b>${esc(T('{0}本', fmt(pc)))}</b></p>`;
+      h += `<h3>${esc(T('各層の一番乗り'))}</h3>`;
+      for (let f = 1; f <= 99; f++) h += `<p class="e-fl" data-f="${f}"><small>${esc(T('第{0}層', f))}　${lvName(f)}${f === hard ? `<em>${esc(T('いちばんの難所'))}</em>` : ''}</small>${nm(firstOf(f) || W.open[f])}</p>`;
+      h += `<h3>${esc(T('スタッフ'))}</h3><p class="e-fl"><small>${esc(T('企画・制作'))}</small>なすびのお庭</p><p class="e-fl"><small>${esc(T('足場をつくった人'))}</small>${esc(T('倒れていった、すべての鉛筆たち'))}</p><p class="e-fl"><small>${esc(T('そして'))}</small>${esc(T('ここまで遊んでくれた、あなた'))}</p>`;
+      roll.innerHTML = h;
+      const budget = C * rowsMax, nOf = f => { const d = dOf(f); return d <= 0 ? 0 : Math.max(1, Math.round(budget * d / Math.max(1, Dsum))); };
+      const marks = [...roll.querySelectorAll('.e-fl[data-f]')].map(el => ({ f: +el.dataset.f, y: el.offsetTop, done: false }));
+      // ---- 毎こま ----
+      const RH = roll.offsetHeight, dur = Math.max(60000, Math.min(110000, RH * 22));
+      let phase = 'roll', t0 = performance.now(), last = t0;
+      const frame = now => {
+        if (stop) return;
+        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        g.setTransform(D, 0, 0, D, 0, 0); g.clearRect(0, 0, WW, HH);
+        if (phase === 'roll') {
+          const y0 = HH * 0.62, p = Math.min(1, (now - t0) / dur), y = Math.round(y0 - p * (RH + y0));   // 名前の見える所（積もった鉛筆の上）から流しはじめる
+          roll.style.transform = `translateY(${y}px)`;
+          for (const m of marks) if (!m.done && m.y + y < HH * 0.6) {
+            m.done = true; const n = nOf(m.f), big = m.f === hard, gap = big ? 16 : Math.min(80, 1500 / Math.max(1, n));
+            for (let i = 0; i < n; i++) queue.push({ at: now + i * gap + Math.random() * 30, big: big && i < 12 });
+            if (big) glow = 1;
+          }
+          if (p >= 1) phase = 'after';
+        }
+        queue.sort((a, b) => a.at - b.at); while (queue.length && queue[0].at <= now) drop(queue.shift().big);
+        let sx = 0, sy = 0; if (shake > 0) { sx = (Math.random() - .5) * shake; sy = (Math.random() - .5) * shake; shake = Math.max(0, shake - dt * 20); }
+        g.globalAlpha = pileOn; g.setTransform(1, 0, 0, 1, Math.round(sx * D), Math.round(sy * D)); g.drawImage(pile, 0, 0); g.setTransform(D, 0, 0, D, sx, sy);
+        for (let i = falling.length - 1; i >= 0; i--) { const b = falling[i]; b.vy += 1500 * dt; b.y += b.vy * dt; if (b.y >= b.ty) { land(b); falling.splice(i, 1); continue; } drawPencil(g, b.x, b.y, ps, b.seed, b.ang * (1 - Math.min(1, b.y / b.ty)), 1, '#2b2b33', false, 0, b.tier); }
+        for (let i = dust.length - 1; i >= 0; i--) { const q = dust[i]; q.life -= dt; if (q.life <= 0) { dust.splice(i, 1); continue; } q.x += q.vx * dt; q.y += q.vy * dt; q.vy += 200 * dt; g.fillStyle = `rgba(80,70,60,${q.life})`; g.fillRect(q.x, q.y, 2, 2); }
+        if (glow > 0) { let top = HH; for (let c = 0; c < C; c++) top = Math.min(top, HH - hgt[c] * ph); const gr = g.createLinearGradient(0, top - 70, 0, HH); gr.addColorStop(0, 'rgba(255,214,90,0)'); gr.addColorStop(.3, `rgba(255,214,90,${.4 * glow})`); gr.addColorStop(1, 'rgba(255,214,90,0)'); g.fillStyle = gr; g.fillRect(0, top - 70, WW, HH - top + 70); if (phase === 'roll') glow = Math.max(0, glow - dt * .5); }
+        g.globalAlpha = 1;
+        raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+      while (phase === 'roll' && !stop) await wait(200);
+      await wait(1500); if (stop) return;
+      const showCard = async (html, ms) => { card.innerHTML = `<div class="ec in">${html}</div>`; await wait(ms); if (stop) return; card.firstChild.classList.remove('in'); card.firstChild.classList.add('out'); await wait(700); card.innerHTML = ''; };
+      // ---- 2. 第100層 ----
+      await showCard(`<p class="ec-k">${esc(T('第{0}層', 100))}</p><p class="ec-n">${lvName(100)}</p><p class="ec-s">${esc(T('ここで{0}回、だれかが倒れた', fmt(dOf(100))))}</p>`, 3200); if (stop) return;
+      const o100 = firstOf(100) || W.open[100];
+      if (o100 && o100.id && !OFFLINE) {
+        let c = null; try { c = await Promise.race([N.rest('clear/100/' + o100.id), wait(8000).then(() => null)]); } catch (e) { c = null; }
+        if (c && typeof c.r === 'string' && !stop) {
+          const lv = getLevel(100), view = FT.corParse(c.c || ''), lim = Math.min(FT.V.CMAX, (c.k | 0) + 2);
+          Object.assign(WT, { c, f: 100, name: nameOf(o100), view, use: view, gos: parseGos(c.r), lim, speed: Math.max(1, Math.min(4, Math.round((c.k / 120) / 30))) });
+          startWatch(); $('watchBar').classList.remove('on');
+          cap.innerHTML = `<small>${esc(T('第100層の一番乗り'))}</small><b>${nm(o100)}</b>`; cap.classList.add('on');
+          box.classList.add('see'); pileOn = 0; S.paused = false;   // 再生のあいだは動かす
+          const t1 = performance.now(); while (!stop && !WT.done && performance.now() - t1 < 120000) await wait(200);
+          await wait(2400); if (stop) return;
+          S.paused = true; box.classList.remove('see'); cap.classList.remove('on'); pileOn = 1; await wait(800);
+        }
+      }
+      if (stop) return;
+      // ---- 3. 卒業生 ----
+      glow = 1; SND.se('clear');
+      const gl = grads.slice(0, 12).map(x => esc(N.cleanName(x.w || x.n) || T('名無し'))).join('<br>');
+      await showCard(`<p class="ec-k">${esc(T('卒業'))}</p><p class="ec-t">${esc(T('第100層を越えた人'))}</p><p class="ec-n">${o100 ? nm(o100) : '&nbsp;'}</p>${grads.length > 1 ? `<p class="ec-s">${gl}${grads.length > 12 ? '<br>' + esc(T('ほか{0}人', grads.length - 12)) : ''}</p>` : ''}`, 5200); if (stop) return;
+      // ---- 4. あなたの記録 ----
+      if (ME.dead > 0) {
+        const tr0 = myShine();
+        card.innerHTML = `<div class="ec in"><p class="ec-k">${esc(T('あなたの記録'))}</p><div class="ec-me"><p><small>${esc(T('あなたの鉛筆'))}</small><b data-n="${ME.dead}">0</b><i>${esc(T('本'))}</i></p><p><small>${esc(T('いちばん先'))}</small><b>${esc((ME.best | 0) > 100 ? T('卒業') : T('第{0}層', Math.min(100, Math.max(1, ME.best | 0))))}</b></p><p><small>${esc(T('鉛筆の輝き'))}</small><b class="sm">${esc(tr0 ? T(SHINE_NAME[tr0]) : T('まだなし'))}</b></p></div></div>`;
+        const els = card.querySelectorAll('b[data-n]'), t2 = performance.now();
+        while (!stop && performance.now() - t2 < 1600) { const k = Math.min(1, (performance.now() - t2) / 1500), e2 = 1 - Math.pow(1 - k, 3); for (const el of els) el.textContent = fmt(Math.round(+el.dataset.n * e2)); await wait(30); }
+        for (const el of els) el.textContent = fmt(+el.dataset.n);
+        await wait(4800); if (stop) return;
+        if (card.firstChild) { card.firstChild.classList.remove('in'); card.firstChild.classList.add('out'); } await wait(700); card.innerHTML = '';
+      }
+      // ---- 5. おわり ----
+      ty.classList.add('on'); $('endSkip').textContent = T('とじる');
+      await wait(10000); finish();
+    });
+    return endOn;
+  }
+  // 卒業したら、タイトルに「エンドロール」のボタンを出す（?endroll=1 をつけると、卒業前でも見られる：たしかめ用）
+  function paintEndBtn() { $('bEnd').hidden = !(W.done || /[?&]endroll=1/.test(location.search)); }
+  $('bEnd').onclick = () => { playEnding().then(() => toTitle()); };
   // 管理画面などから使う
   FT.APP = { S, W, ME, getLevel, draw, toast, tick, camera, newLife, enterFloor, drawTitleBg, drawPencil, paper, paintTitle, hud,
     // 試験用：越えた記録を、読みこまずにそのまま再生する
